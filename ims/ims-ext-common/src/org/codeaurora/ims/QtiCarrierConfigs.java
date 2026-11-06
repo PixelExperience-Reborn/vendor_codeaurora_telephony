@@ -27,7 +27,7 @@
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the
@@ -75,9 +75,6 @@ public class QtiCarrierConfigs {
      */
     private QtiCarrierConfigs() {
     }
-
-    /* Flag specifying whether video calls are supported if device is in low battery or not */
-    public static final String ALLOW_VIDEO_CALL_IN_LOW_BATTERY = "allow_video_call_in_low_battery";
 
     /**
      * Flag indicating whether preview video needs to be hidden during
@@ -156,18 +153,6 @@ public class QtiCarrierConfigs {
     public static final String KEY_CARRIER_B2C_ENRICHED_CALLING_SUPPORTED =
             "carrier_b2c_enriched_calling_supported_bool";
 
-    /* Config to determine if Carrier supports video CRS
-     * true - if video CRS is supported else false
-     */
-    public static final String KEY_CARRIER_VIDEO_CRS_SUPPORTED =
-            "carrier_video_crs_supported_bool";
-
-    /* Config to determine if Carrier supports video CRBT
-     * true - if video CRBT is supported else false
-     */
-    public static final String KEY_CARRIER_VIDEO_CRBT_SUPPORTED =
-            "config_enable_video_crbt";
-
     /* Config to determine if Carrier supports showing call progress notiication during alerting.
      * true - if call progress notification is supported else false
      */
@@ -209,4 +194,10 @@ public class QtiCarrierConfigs {
      */
     public static final String KEY_CARRIER_VIDEO_ONLINE_SERVICE_SUPPORTED =
         "carrier_video_online_service_supported_bool";
+
+    /* Config to determine if Carrier supports glasses free 3D video
+     * true - if glasses free 3D video is supported else false
+     */
+    public static final String KEY_CARRIER_GLASSES_FREE_3D_VIDEO_SUPPORTED =
+        "carrier_glasses_free_3D_video_supported_bool";
 }

@@ -25,6 +25,10 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 package org.codeaurora.ims.utils;
 
@@ -37,6 +41,7 @@ import android.telephony.CarrierConfigManager;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.util.Log;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -83,6 +88,14 @@ public class QtiCarrierConfigHelper {
                         Log.d(TAG, "Clear carrier configs on phone Id: " + phoneId);
                         mConfigsMap.remove(phoneId);
                     }
+                }
+            } else if (intent != null &&
+                    intent.getAction().equals(TelephonyManager.ACTION_MULTI_SIM_CONFIG_CHANGED)) {
+                int activeModemCount = intent.getIntExtra(
+                        TelephonyManager.EXTRA_ACTIVE_SIM_SUPPORTED_COUNT, 1);
+                Log.d(TAG, "activeModemCount:: " + activeModemCount);
+                if (activeModemCount != PHONE_COUNT) {
+                    PHONE_COUNT = activeModemCount;
                 }
             }
         }
@@ -150,10 +163,11 @@ public class QtiCarrierConfigHelper {
                 loadConfigsForSubInfo(subInfo);
             }
         }
-        subCache = new int[PHONE_COUNT];
+        subCache = new int[2];
         IntentFilter filter = new IntentFilter(CarrierConfigManager
                 .ACTION_CARRIER_CONFIG_CHANGED);
         filter.addAction(QtiCallConstants.ACTION_ESSENTIAL_RECORDS_LOADED);
+        filter.addAction(TelephonyManager.ACTION_MULTI_SIM_CONFIG_CHANGED);
         mContext.registerReceiver(mReceiver, filter, Context.RECEIVER_EXPORTED);
         mSubscriptionManager.addOnSubscriptionsChangedListener(mOnSubscriptionsChangeListener);
     }
@@ -199,8 +213,8 @@ public class QtiCarrierConfigHelper {
     }
 
     public boolean getBoolean(Context context, int phoneId, String key) {
-        if (!isValidPhoneId(phoneId)) {
-            Log.d(TAG, "Invalid phone ID: " + phoneId);
+        if (!isValidPhoneId(phoneId) || TextUtils.isEmpty(key)) {
+            Log.d(TAG, "Invalid phone ID: " + phoneId + " or key is null");
             return false;
         }
         sanityCheckConfigsLoaded(context, phoneId);
@@ -214,8 +228,8 @@ public class QtiCarrierConfigHelper {
     }
 
     public boolean getBoolean(int phoneId, String key) {
-        if (!isValidPhoneId(phoneId)) {
-            logd("getBoolean", "Invalid phone ID: " + phoneId);
+        if (!isValidPhoneId(phoneId) || TextUtils.isEmpty(key)) {
+            Log.d(TAG, "Invalid phone ID: " + phoneId + " or key is null");
             return false;
         }
         if (!mInitialized.get()) {
@@ -231,8 +245,8 @@ public class QtiCarrierConfigHelper {
     }
 
     public String[] getStringArray(Context context, int phoneId, String key) {
-        if (!isValidPhoneId(phoneId)) {
-            Log.d(TAG, "Invalid phone ID: " + phoneId);
+        if (!isValidPhoneId(phoneId) || TextUtils.isEmpty(key)) {
+            Log.d(TAG, "Invalid phone ID: " + phoneId + " or key is null");
             return null;
         }
         sanityCheckConfigsLoaded(context, phoneId);
@@ -240,6 +254,21 @@ public class QtiCarrierConfigHelper {
         PersistableBundle pb = mConfigsMap.get(phoneId);
         if (pb != null) {
             return pb.getStringArray(key);
+        }
+        Log.d(TAG, "WARNING, no carrier configs on phone Id: " + phoneId);
+        return null;
+    }
+
+    public int[] getIntArray(Context context, int phoneId, String key) {
+        if (!isValidPhoneId(phoneId) || TextUtils.isEmpty(key)) {
+            Log.d(TAG, "Invalid phone ID: " + phoneId + " or key is null");
+            return null;
+        }
+        sanityCheckConfigsLoaded(context, phoneId);
+        logd("getIntArray", "mInitialized - " + mInitialized.get() + " context - " + context);
+        PersistableBundle pb = mConfigsMap.get(phoneId);
+        if (pb != null) {
+            return pb.getIntArray(key);
         }
         Log.d(TAG, "WARNING, no carrier configs on phone Id: " + phoneId);
         return null;

@@ -27,18 +27,25 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ * package com.qti.extphone;
+ */
+
 package com.qti.extphone;
 
 import android.os.Parcel;
 import android.os.Parcelable;
 
-public class NrIconType implements Parcelable{
+public class NrIconType implements Parcelable {
     private static final String TAG = "NrIconType";
 
     public static final int INVALID = -1;
     public static final int TYPE_NONE = 0;
     public static final int TYPE_5G_BASIC = 1;
     public static final int TYPE_5G_UWB = 2;
+    public static final int TYPE_5G_PLUS_PLUS = 3;
 
     private int mValue;
 
