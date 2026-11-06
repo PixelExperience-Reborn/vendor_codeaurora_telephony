@@ -1,0 +1,104 @@
+name: A17 Qualcomm direct telephony tag source preflight
+
+on:
+  push:
+    branches:
+      - audit/a17-qti-telephony-mondrian-20261106
+    paths:
+      - '.github/workflows/a17-qti-telephony-tag-preflight.yml'
+      - 'docs/ANDROID_17_QUALCOMM_SOURCE_SELECTION.md'
+  pull_request:
+    paths:
+      - '.github/workflows/a17-qti-telephony-tag-preflight.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-qualcomm-source-tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout PE historical audit (not active AOSP17 ROM)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read exact Qualcomm Android17 source tag
+        run: |
+          set -euo pipefail
+          REMOTE=$(tr -d '\r\n' < .gitupstream)
+          test "$REMOTE" = "https://git.codelinaro.org/clo/la/platform/vendor/codeaurora/telephony"
+          TAG=LA.QSSI.17.0.r1-12400-qssi.0
+          EXPECTED_REF=c3872c75d407dfbf05e332a1b6c0c0924906edf9
+          actual=$(timeout 65 git ls-remote --tags --refs "$REMOTE" "refs/tags/$TAG" | cut -f1)
+          test "$actual" = "$EXPECTED_REF" || { echo "FAIL: Qualcomm release tag moved or missing: $actual"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/qualcomm"
+          git -C "$RUNNER_TEMP/qualcomm" init -q
+          git -C "$RUNNER_TEMP/qualcomm" remote add origin "$REMOTE"
+          git -C "$RUNNER_TEMP/qualcomm" fetch -q --no-tags --depth=1 \
+            --filter=blob:none origin "refs/tags/$TAG"
+          peeled=$(git -C "$RUNNER_TEMP/qualcomm" rev-parse 'FETCH_HEAD^{commit}')
+          tree=$(git -C "$RUNNER_TEMP/qualcomm" rev-parse 'FETCH_HEAD^{tree}')
+          echo "QUALCOMM release tag $TAG"
+          echo "QUALCOMM git tag ref $actual"
+          echo "QUALCOMM peeled commit $peeled"
+          echo "QUALCOMM root Git tree $tree"
+          git -C "$RUNNER_TEMP/qualcomm" show -s --format='QUALCOMM commit: %h %ad %s' --date=iso-strict "$peeled"
+          test -n "$tree"
+      - name: Audit actual Qualcomm Java library modules, interfaces, and old-PE diff
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import subprocess
+
+          checkout = Path(os.environ["RUNNER_TEMP"]) / "qualcomm"
+          def git(*args):
+              return subprocess.check_output(["git", "-C", str(checkout), *args],
+                                             text=True).strip()
+          ref = "FETCH_HEAD"
+          all_paths = git("ls-tree", "-r", "--name-only", ref).splitlines()
+          libs = ["extphone/Android.bp", "ims/ims-ext-common/Android.bp",
+                  "qti-hidl-wrapper/Android.bp", "qti-utils/Android.bp",
+                  "extphone/src/com/qti/extphone/IExtPhone.aidl",
+                  "ims/ims-ext-common/src/org/codeaurora/ims/internal/IQtiImsExt.aidl"]
+          missing = set(libs) - set(all_paths)
+          assert not missing, f"missing Qualcomm telephony API or modules: {missing}"
+          bp = {name: git("show", f"{ref}:{name}") for name in libs[:4]}
+          for key, name in [
+              ("extphone/Android.bp", "extphonelib"),
+              ("ims/ims-ext-common/Android.bp", "ims-ext-common"),
+              ("qti-hidl-wrapper/Android.bp", "qti-telephony-hidl-wrapper"),
+              ("qti-utils/Android.bp", "qti-telephony-utils"),
+          ]:
+              assert f'name: "{name}"' in bp[key], (key, name)
+          assert "android.hardware.radio-V1.6-java" in bp["extphone/Android.bp"], "review new Qualcomm radio API dependencies"
+          assert "android.hidl.base-V1.0-java" in bp["qti-hidl-wrapper/Android.bp"], "review new Qualcomm HIDL dependency"
+          names = set(all_paths)
+          print(f"PASS: direct Qualcomm telephony source has {len(all_paths)} tracked files")
+          print("PASS: four compatible Qualcomm library module names and two AIDL interface files present")
+          for needle in ("ConfURIDialer", "VideoCallProvider", "QtiVideoCallDataUsage"):
+              print(f"SOURCE INVENTORY {needle}: {sum(needle in p for p in names)} paths")
+          for key, contents in bp.items():
+              print(f"SOONG {key}: " +
+                    " ".join(row.strip() for row in contents.splitlines()
+                             if "min_sdk_version" in row or "sdk_version:" in row
+                             or "android.hardware.radio-" in row
+                             or "android.hidl.base-" in row))
+          print("SOURCE-ONLY: no claim of compatible Xiaomi IMS APK or functional VoLTE")
+          PY
+      - name: Verify ROM baseline owner remains unmodified
+        run: |
+          git clone -q --depth=1 --branch port/a17-aosp17-manifest-20261102 \
+            https://github.com/PixelExperience-Reborn/manifest.git "$RUNNER_TEMP/manifest"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import xml.etree.ElementTree as ET
+          root = Path(os.environ["RUNNER_TEMP"]) / "manifest"
+          owners = {p.get("path") or p.get("name"): p.get("name")
+                    for p in ET.parse(root/"aosp17_reference.xml").getroot().findall("project")}
+          assert "vendor/codeaurora/telephony" not in owners
+          assert owners.get("hardware/ril") == "platform/hardware/ril"
+          print("PASS: direct Qualcomm source remains isolated from AOSP17 default manifest")
+          PY
