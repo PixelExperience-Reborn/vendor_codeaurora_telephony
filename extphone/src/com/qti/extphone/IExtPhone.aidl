@@ -28,9 +28,8 @@
  */
 
 /*
- * Changes from Qualcomm Innovation Center are provided under the following license:
- *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -38,17 +37,23 @@ package com.qti.extphone;
 
 import android.telephony.ImsiEncryptionInfo;
 
+import com.qti.extphone.CellularRoamingPreference;
 import com.qti.extphone.CiwlanConfig;
 import com.qti.extphone.Client;
+import com.qti.extphone.DataPriorityPreference;
+import com.qti.extphone.DataStallInfo;
+import com.qti.extphone.DualDataRecommendation;
 import com.qti.extphone.IDepersoResCallback;
 import com.qti.extphone.IExtPhoneCallback;
 import com.qti.extphone.MsimPreference;
+import com.qti.extphone.Nr5gNtnMode;
 import com.qti.extphone.NrConfig;
 import com.qti.extphone.QtiImeiInfo;
 import com.qti.extphone.QtiPersoUnlockStatus;
 import com.qti.extphone.QtiSetNetworkSelectionMode;
 import com.qti.extphone.QtiSimType;
 import com.qti.extphone.Token;
+import com.qti.extphone.TurboDsdaPreference;
 
 interface IExtPhone {
 
@@ -219,6 +224,7 @@ interface IExtPhone {
     /**
     * Async api
     * Requires permission: android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE
+    * @deprecated Use {@link #queryNrIcon} instead.
     */
     Token queryNrIconType(int slotId, in Client client);
 
@@ -311,17 +317,6 @@ interface IExtPhone {
     Token queryNrConfig(int slotId, in Client client);
 
     /**
-    * Send a CDMA SMS message on a given slotId.
-    * @param - slotId
-    * @param - pdu contains the message to be sent
-    *         callbacks.
-    * @param expectMore more messages are expected to be sent or not
-    * @return Integer Token to be used to compare with the response.
-    * Requires permission: android.Manifest.permission.MODIFY_PHONE_STATE
-    */
-    Token sendCdmaSms(int slotId, in byte[] pdu, boolean expectMore, in Client client);
-
-    /**
     * Get phone radio capability.
     * @param - slotId
     * @param - client registered with packagename to receive callbacks.
@@ -396,7 +391,7 @@ interface IExtPhone {
     Token setCarrierInfoForImsiEncryption(int slotId,
             in ImsiEncryptionInfo info, in Client client);
 
-   /**
+    /**
      * Query call forward status for the given reason.
      *
      * cfReason is one of CF_REASON_*
@@ -404,8 +399,8 @@ interface IExtPhone {
      * @param - client registered with packagename to receive
      *         callbacks.
      */
-    void queryCallForwardStatus(int slotId, int cfReason, int serviceClass, String number,
-            boolean expectMore, in Client client);
+    void queryCallForwardStatus(int slotId, int cfReason, int serviceClass,
+            String number, boolean expectMore, in Client client);
 
     /**
      * Query the status of a facility lock state
@@ -414,8 +409,9 @@ interface IExtPhone {
      *        (eg "AO" for BAOC, "SC" for SIM lock)
      * @param password is the password, or "" if not required
      * @param serviceClass is the TS 27.007 service class bit vector of services to query
-     * @param appId is AID value, See ETSI 102.221 8.1 and 101.220 4, empty string if no value.
-     *        This is only applicable in the case of Fixed Dialing Numbers (FDN) requests.
+     * @param appId is AID value, See ETSI 102.221 8.1 and 101.220 4, empty string
+     *        if no value. This is only applicable in the case of Fixed Dialing Numbers
+     *        (FDN) requests.
      * @param - client registered with packagename to receive
      *         callbacks.
      */
@@ -511,6 +507,8 @@ interface IExtPhone {
 
     /**
      * Request for smart DDS switch capability supported by modem.
+     * Prefer the slot-agnostic variant {@link getDdsSwitchConfigCapability} if the vendor
+     * supports it.
      * @param - slotId slot ID
      * @return - Integer Token can be used to compare with the response.
      */
@@ -520,6 +518,8 @@ interface IExtPhone {
      * Inform modem if user enabled/disabled UI preference for data during voice call.
      * if its enabled then modem can send recommendations to switch DDS during
      * voice call on nonDDS.
+     * Prefer the slot-agnostic variant
+     * {@link sendUserPreferenceConfigForDataDuringVoiceCall} if the vendor supports it.
      * @param - slotId slot ID
      * @param - userPreference true/false based on UI preference
      * @param - client registered with packagename to receive
@@ -530,7 +530,8 @@ interface IExtPhone {
              boolean userPreference, in Client client);
 
     /**
-     * Request for epdg over cellular data (cellular IWLAN) feature is supported or not.
+     * Request for epdg over cellular data (cellular IWLAN) feature is supported
+     * or not.
      *
      * @param - slotId slot ID
      * @return - boolean value indicates if the feature is supported or not
@@ -625,4 +626,254 @@ interface IExtPhone {
      * @return - persoUnlockStatus which can be generally temporary or permanent.
      */
     QtiPersoUnlockStatus getSimPersoUnlockStatus(int slotId);
+
+    /**
+     * Inform modem whether we allow Temp DDS Switch to the individual slots.
+     * This takes into account factors like the switch state of 'Data During Calls'
+     * setting, the current roaming state of the individual subscriptions and their
+     * data roaming enabled state.
+     * If data during calls is allowed, modem can send recommendations to switch
+     * DDS during a voice call on the non-DDS.
+     *
+     * This is a slot-agnostic variant of
+     * {@link sendUserPreferenceForDataDuringVoiceCall}, and should be preferred.
+     *
+     * @param isAllowedOnSlot vector containing a boolean per slot that determines whether
+     *        we allow temporary DDS switch to that slot.
+     * @param client Client registered to receive the response callback.
+     * @return Token to be used to compare with the response callback.
+     *
+     * Response function is
+     * IExtPhoneCallback.onSendUserPreferenceConfigForDataDuringVoiceCall().
+     */
+    Token sendUserPreferenceConfigForDataDuringVoiceCall(in boolean[] isAllowedOnSlot,
+            in Client client);
+
+    /**
+     * Request for Smart Temp DDS Switch capability from the modem. This determines
+     * the overall capability of the Smart Temp DDS switch feature.
+     *
+     * This is a slot-agnostic variant of {@link getDdsSwitchCapability}, and should
+     * be preferred.
+     *
+     * @param client Client registered to receive the response callback.
+     * @return Token to be used to compare with the response callback.
+     *
+     * Response function is IExtPhoneCallback.onDdsSwitchConfigCapabilityChanged().
+     */
+    Token getDdsSwitchConfigCapability(in Client client);
+
+    /**
+     * Get the cellular roaming preference for the specified slot
+     *
+     * @param slotId - slot ID about which the request is sent
+     * @return - International and domestic cellular roaming preference
+     */
+     CellularRoamingPreference getCellularRoamingPreference(int slotId);
+
+    /**
+     * Set the cellular roaming preference for the specified slot
+     *
+     * @param client - Client registered with package name to receive callbacks.
+     * @param slotId - slot ID for which the request is sent
+     * @param pref - The international and domestic cellular roaming preference
+     * @return - Integer token to compare with the response
+     */
+     Token setCellularRoamingPreference(in Client client, int slotId,
+            in CellularRoamingPreference pref);
+    /**
+     * Request for C_IWLAN availability.
+     *
+     * This API returns true or false based on various conditions like internet PDN
+     * is established on DDS over LTE/NR RATs, CIWLAN is supported in home/roaming etc..
+     * This is different from existing API IExtPhone#isEpdgOverCellularDataSupported()
+     * which returns true if modem supports the CIWLAN feature based on static
+     * configuration in modem.
+     *
+     * @param - slotId slot ID
+     * @return - boolean TRUE/FALSE based on C_IWLAN availability.
+     */
+    boolean isCiwlanAvailable(int slotId);
+
+    /**
+     * Set C_IWLAN mode user preference.
+     *
+     * @param slotId - slot ID
+     * @param client - Client registered with package name to receive callbacks.
+     * @param CiwlanConfig - The C_IWLAN mode user preference (only vs preferred)
+     *                       for home and roaming.
+     * @return - Integer Token can be used to compare with the response.
+     */
+    Token setCiwlanModeUserPreference(int slotId, in Client client, in CiwlanConfig ciwlanConfig);
+
+    /**
+     * Get C_IWLAN mode user preference
+     *
+     * This function returns C_IWLAN mode user preference set by the user whereas
+     * IQtiRadio#getCiwlanConfig() returns actual C_IWLAN mode set by the modem.
+     *
+     * @param slotId - slot ID
+     * @return - The C_IWLAN mode user preference (only vs preferred) for home and roaming.
+     */
+    CiwlanConfig getCiwlanModeUserPreference(int slotId);
+
+    /**
+     * Get the NR icon information to be shown on the UI
+     *
+     * @param slotId - Slot ID for which this request is sent
+     * @param client - Client registered with package name to receive callbacks
+     * @return - Integer token to compare with the response
+     */
+    Token queryNrIcon(int slotId, in Client client);
+
+    /**
+     * Sets the data prioritization preference.
+     *
+     * Sets user/application preference to maximize
+     * the aggregated data throughput (SUB1 and SUB2 together).
+     *
+     * @param client - Client registered with package name to receive callbacks.
+     * @param pref - DataPriorityPreference contains aggregated throughput for both SUBs or not.
+     * @return - Integer Token can be used to compare with the response.
+     */
+    Token setDataPriorityPreference(in Client client, in DataPriorityPreference pref);
+
+    /**
+     * Sets the Turbo DSDA mode preference.
+     *
+     * In Turbo DSDA mode, modem can aggregate up to four downlink carriers
+     * simultaneously to improve data throughput. If Turbo DSDA mode is disabled,
+     * modem aggregates up to three downlink carriers simultaneously.
+     *
+     * @param client - Client registered with package name to receive callbacks.
+     * @param pref - TurboDsdaPreference user preference to enable or disable turbo mode.
+     * @return - Integer Token can be used to compare with the response.
+     */
+    Token setTurboDsdaPreference(in Client client, in TurboDsdaPreference pref);
+
+    /**
+     * Register for MMS PDN immediate retry notifications.
+     *
+     * @param slotId - slot ID
+     * @param pendingIntent - PendingIntent to be notified when MMS PDN immediate retry
+     *        is available
+     */
+    void registerForMmsPdnImmediateRetry(int slotId, in PendingIntent pendingIntent);
+
+    /**
+     * Unregister for MMS PDN immediate retry notifications.
+     *
+     * @param slotId - slot ID
+     * @param pendingIntent - PendingIntent to unregister
+     */
+    void unregisterForMmsPdnImmediateRetry(int slotId, in PendingIntent pendingIntent);
+
+    /**
+     * Check if MMS is unrestricted by traffic protection.
+     *
+     * @param slotId - slot ID
+     * @return - boolean TRUE if MMS is unrestricted, FALSE otherwise
+     */
+    boolean isMmsUnrestrictedByTrafficProtection(int slotId);
+
+    /**
+     * Get the radio icon information to be shown on the UI.
+     *
+     * This API gets the current radio icon status including:
+     * - 5G icon types (BASIC, UWB, PLUS_PLUS)
+     * - NB-IoT icon status
+     * - Rx antenna configuration (e.g., 6RX)
+     *
+     * @param slotId - Slot ID for which this request is sent
+     * @param client - Client registered with package name to receive callbacks
+     * @return - Integer token to compare with the response
+     * Requires permission: android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE
+     */
+    Token queryRadioIcon(int slotId, in Client client);
+
+    /**
+     * Set NR 5G NTN (Non-Terrestrial Network) preference.
+     *
+     * This API allows setting the NR 5G NTN mode to:
+     * - DISABLE: Disable NR5G NTN
+     * - ENABLE: Enable NR5G NTN along with other existing RATs
+     * - TEST: Enable NR5G NTN only mode (test mode)
+     *
+     * @param slotId - Slot ID for which this request is sent
+     * @param mode - Nr5gNtnMode preference to be set
+     * @param client - Client registered with package name to receive callbacks
+     * @return - Integer token to compare with the response
+     * Requires permission: android.Manifest.permission.MODIFY_PHONE_STATE
+     */
+    Token setNr5gNtnPreference(int slotId, in Nr5gNtnMode mode, in Client client);
+
+    /**
+     * Notify RIL about data stall detection status.
+     * This API is called when:
+     * 1. Data stall is detected on the internet data network (when smart permanent DDS switch
+     *    preference is enabled)
+     * 2. Data stall is recovered
+     * 3. DDS switch occurs (to inform both subscriptions have no data stall)
+     *
+     * @param slotId - Slot ID for which this request is sent
+     * @param client - Client registered with package name to receive callbacks
+     * @param info - Data stall information (true=stalled, false=recovered/no stall)
+     * @return - Integer Token can be used to compare with the response.
+     */
+    Token sendDataStallStatus(int slotId, in Client client, in DataStallInfo info);
+
+    /**
+     * Switch the device multi-SIM configuration.
+     *
+     * This API is currently used by the vendor DSDS<->SS auto-switch feature (for example when
+     * {@code persist.vendor.radio.dsds_to_ss = 2}) to force the apps into a target
+     * multi-SIM mode.
+     *
+     * Typical usage:
+     * - Switch to SS (single-SIM) when fewer than two subscriptions are ACTIVE.
+     * - Switch to DSDS (dual-SIM dual-standby) when device DSDS Mode is needed.
+     *
+     * @param config Target multi-SIM configuration to apply.
+     *        - 1: SS (single SIM)
+     *        - 2: DSDS (dual SIM dual standby)
+     */
+    void switchMultiSimConfig(int config);
+
+    /**
+     * Issues a request to retrieve auxiliary radio icon information that is common across
+     * subscriptions. This API is used by framework clients to
+     * obtain inforomation such as the DSDA category details (NONE, GENERAL, TURBO) that may
+     * influence how the cellular icon is rendered in UI.
+     *
+     * The request is asynchronous, and its result is returned through
+     * onAuxiliaryRadioIconInfoResponse.
+     *
+     * @param client - Client registered with package name to receive callbacks
+     *
+     * @see IExtPhoneCallback#onAuxiliaryRadioIconInfoResponse
+     */
+    Token getAuxiliaryRadioIconInfo(in Client client);
+
+    /**
+     * Get current dual data recommendation
+     *
+     * @param callingPackageName for which package is calling this API.
+     * @return DualDataRecommendation object if there, otherwise null.
+     * Requires permission: android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE
+     */
+    DualDataRecommendation getDualDataRecommendation(in String callingPackageName);
+
+    /**
+     * Set Narrowband Terrestrial Network (NB-TN) preference.
+     *
+     * NB-TN, also known as NB-IoT (Internet of Things), is a subset of the LTE standard which can
+     * support low data/delay-tolerant data applications and in case of mobile, it is used as
+     * coverage extension when regular 5G/4G/3G is not available.
+     *
+     * @param slotId - slot ID which the request applies to
+     * @param client - Client registered with package name to receive callbacks
+     * @param enable - true to enable the NB TN feature, false to disable
+     * @return - Integer Token can be used to compare with the response.
+     */
+    Token setNbTnPreference(int slotId, in Client client, boolean enable);
 }

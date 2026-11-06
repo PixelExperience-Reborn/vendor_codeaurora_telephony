@@ -24,28 +24,48 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package org.codeaurora.ims;
 
+import android.os.RemoteException;
 import org.codeaurora.ims.internal.ICrsCrbtListener;
+import org.codeaurora.ims.utils.QtiImsExtUtils;
+
+import java.util.concurrent.Executor;
 
 public abstract class CrsCrbtListenerBase {
 
     private final class CrsCrbtListener extends ICrsCrbtListener.Stub {
 
         public void onCrsDataUpdated(int phoneId, int crsType,
-                boolean isPreparatory) {
-            CrsCrbtListenerBase.this.onCrsDataUpdated(phoneId, crsType,
-                    isPreparatory);
+                boolean isPreparatory) throws RemoteException {
+            QtiImsExtUtils.executeMethodAsync(() ->
+                    CrsCrbtListenerBase.this.onCrsDataUpdated(phoneId, crsType,
+                    isPreparatory), "onCrsDataUpdated", mExecutor);
         }
 
-        public void onSipDtmfReceived(int phoneId, String configCode) {
-            CrsCrbtListenerBase.this.onSipDtmfReceived(phoneId, configCode);
+        public void onSipDtmfReceived(int phoneId, String configCode) throws RemoteException {
+            QtiImsExtUtils.executeMethodAsync(() ->
+                    CrsCrbtListenerBase.this.onSipDtmfReceived(phoneId, configCode),
+                    "onSipDtmfReceived", mExecutor);
         }
     }
 
     private CrsCrbtListener mListener;
+    private Executor mExecutor;
+
+    public CrsCrbtListenerBase() {
+        mExecutor = Runnable::run;
+    }
+
+    public CrsCrbtListenerBase(Executor executor) {
+        mExecutor = executor;
+    }
 
     public ICrsCrbtListener getBinder() {
         if (mListener == null) {

@@ -26,7 +26,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear.
  */
 
@@ -229,4 +229,21 @@ oneway interface IQtiImsExtListener {
      * @return void.
      */
     void handleSendVosActionInfoResponse(int phoneId, int result);
+
+    /**
+     * Notifies client the result of set glasses free 3d video capability
+     *
+     * @param phoneId indicates the phone instance which triggered the request
+     * @param <result> is one of the values QTI_IMS_REQUEST_*, as defined in
+     *        <code>org.codeaurora.ims.utils.QtiImsExtUtils.</code>
+     * @return void.
+     */
+    void onSetGlassesFree3dVideoCapabilityResponse(int phoneId, int result);
+
+    /**
+     * Notify Dialer that an MT dual-upgrade (VT + RTT) is about to be surfaced.
+     * IMS should invoke this before sending the VT modify request up to AOSP.
+     *
+     */
+    void onIncomingRttVtUpgrade();
 }

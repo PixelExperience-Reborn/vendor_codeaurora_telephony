@@ -24,44 +24,67 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package org.codeaurora.ims;
 
+import android.os.RemoteException;
 import java.util.List;
+import java.util.concurrent.Executor;
 import org.codeaurora.ims.MultiIdentityLineInfo;
 import org.codeaurora.ims.internal.IImsMultiIdentityListener;
+import org.codeaurora.ims.utils.QtiImsExtUtils;
 
 public abstract class ImsMultiIdentityListenerBase {
 
     private final class MultiIdentityListener extends IImsMultiIdentityListener.Stub {
 
-        public void onUpdateRegistrationInfoResponse(int phoneId, int response){
-            ImsMultiIdentityListenerBase.this.
-                    onUpdateRegistrationInfoResponse(phoneId, response);
+        public void onUpdateRegistrationInfoResponse(int phoneId, int response)
+                                                     throws RemoteException {
+            QtiImsExtUtils.executeMethodAsync(() ->
+                    ImsMultiIdentityListenerBase.this.
+                    onUpdateRegistrationInfoResponse(phoneId, response),
+                    "onUpdateRegistrationInfoResponse", mExecutor);
         }
 
         public void onRegistrationStatusChange(int phoneId,
-                List<MultiIdentityLineInfo> info) {
-            ImsMultiIdentityListenerBase.this.
-                    onRegistrationStatusChange(phoneId, info);
+                List<MultiIdentityLineInfo> info) throws RemoteException {
+            QtiImsExtUtils.executeMethodAsync(() ->
+                    ImsMultiIdentityListenerBase.this.
+                    onRegistrationStatusChange(phoneId, info),
+                    "onRegistrationStatusChange", mExecutor);
         }
 
         public void onQueryVirtualLineInfoResponse(int phoneId,
                 String msisdn,
-                List<String> pAssociatedUri) {
-            ImsMultiIdentityListenerBase.this.
-                onQueryVirtualLineInfoResponse(phoneId, msisdn, pAssociatedUri);
+                List<String> pAssociatedUri) throws RemoteException {
+            QtiImsExtUtils.executeMethodAsync(() ->
+                    ImsMultiIdentityListenerBase.this.
+                    onQueryVirtualLineInfoResponse(phoneId, msisdn, pAssociatedUri),
+                    "onQueryVirtualLineInfoResponse", mExecutor);
         }
     }
 
     private MultiIdentityListener mListener;
+    private Executor mExecutor;
 
     public IImsMultiIdentityListener getListener() {
         if (mListener == null) {
             mListener = new MultiIdentityListener();
         }
         return mListener;
+    }
+
+    public ImsMultiIdentityListenerBase() {
+        mExecutor = Runnable::run;
+    }
+
+    public ImsMultiIdentityListenerBase(Executor executor) {
+        mExecutor = executor;
     }
 
     protected void onUpdateRegistrationInfoResponse(int phoneId, int response){

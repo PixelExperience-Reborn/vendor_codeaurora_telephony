@@ -59,6 +59,14 @@ public class CiwlanConfig implements Parcelable {
         }
     }
 
+    public int getCiwlanHomeMode() {
+        return mHomeMode;
+    }
+
+    public int getCiwlanRoamMode() {
+        return mRoamMode;
+    }
+
     public boolean isCiwlanOnlyInHome() {
         return mHomeMode == ONLY;
     }

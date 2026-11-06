@@ -28,27 +28,31 @@
  */
 
 /*
- * Changes from Qualcomm Innovation Center are provided under the following license:
- *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.qti.extphone;
 
+import com.qti.extphone.AuxiliaryRadioIconInfo;
 import android.telephony.CellInfo;
+import com.qti.extphone.CiwlanConfig;
 import com.qti.extphone.BearerAllocationStatus;
 import com.qti.extphone.DcParam;
 import com.qti.extphone.DualDataRecommendation;
 import com.qti.extphone.NetworkSelectionMode;
+import com.qti.extphone.Nr5gNtnMode;
 import com.qti.extphone.NrConfig;
 import com.qti.extphone.NrConfigType;
+import com.qti.extphone.NrIcon;
 import com.qti.extphone.NrIconType;
 import com.qti.extphone.QRadioResponseInfo;
 import com.qti.extphone.QosParametersResult;
 import com.qti.extphone.QtiCallForwardInfo;
 import com.qti.extphone.QtiImeiInfo;
 import com.qti.extphone.QtiPersoUnlockStatus;
+import com.qti.extphone.RadioIcon;
 import com.qti.extphone.SignalStrength;
 import com.qti.extphone.QtiSimType;
 import com.qti.extphone.SmsResult;
@@ -95,16 +99,6 @@ interface IExtPhoneCallback {
     * @param - nrConfig: NSA + SA/NSA/SA
     */
     void onNrConfigStatus(int slotId, in Token token, in Status status, in NrConfig nrConfig);
-
-    /**
-    * Response to sendCdmaSms
-    * @param - slotId
-    * @param - token is the same token which is recived in sendCdmaSms
-    * @param - status SUCCESS/FAILURE based on the modem Result code
-    * @param sms Sms result struct as defined by SmsResult
-    *
-    */
-    void sendCdmaSmsResponse(int slotId, in Token token, in Status status, in SmsResult sms);
 
     /**
     * Response to getQtiRadioCapability
@@ -235,7 +229,7 @@ interface IExtPhoneCallback {
     void onDdsSwitchRecommendation(int slotId, int recommendedSlotId);
 
     /**
-     * Indiactes the delay time to deactivate default data pdn when cellular IWLAN feature is ON.
+     * Indicates the delay time to deactivate default data pdn when cellular IWLAN feature is ON.
      * @param - delayTimeMilliSecs delayTimeMilliSecs>0 indicates one or more pdns
      *           are present on cellular IWLAN RAT and wait for delayTimeMilliSecs
      *           to deactivate default data pdn if required.
@@ -404,4 +398,215 @@ interface IExtPhoneCallback {
      * @param - persoUnlockStatus which can be generally temporary or permanent.
      */
     void onSimPersoUnlockStatusChange(int slotId, in QtiPersoUnlockStatus persoUnlockStatus);
+
+    /**
+     * Indicates that modem capability of Smart Temp DDS Switch has changed.
+     *
+     * Upon receiving this indication, HLOS must inform the modem the user's
+     * preference for enabling temp DDS switch.
+     *
+     * @param token to match request/response.
+     * @param status SUCCESS/FAILURE based on the modem result code
+     * @param isCapable true/false based on whether the device is capable of performing
+     *        Smart Temp DDS switch
+     */
+    void onDdsSwitchConfigCapabilityChanged(in Token token, in Status status, boolean isCapable);
+
+    /**
+     * Indicates that Temp DDS Switch criteria has changed.
+     *
+     * The boolean contained in this indication determines whether the modem-initiated
+     * Smart Temp DDS Switch is to be used, or the telephony-initiated legacy Temp
+     * DDS Switch logic is to be used. If telephony temp DDS switch logic is disabled,
+     * then telephony must wait for modem recommendations to perform the Temp DDS
+     * switch.
+     *
+     * @param telephonyDdsSwitch true/false based on whether telephony temp DDS switch
+     *        logic should be enabled or disabled
+     */
+    void onDdsSwitchConfigCriteriaChanged(boolean telephonyDdsSwitch);
+
+    /**
+     * Indicates the modem's recommendation for the slot on which Temp DDS Switch
+     * has to be made.
+     *
+     * @param recommendedSlotId slot ID to which DDS must be switched
+     */
+    void onDdsSwitchConfigRecommendation(int recommendedSlotId);
+
+    /**
+     * Response to IExtPhone.sendUserPreferenceConfigForDataDuringVoiceCall()
+     *
+     * @param token to match request/response.
+     * @param status SUCCESS/FAILURE based on RIL data module response
+     */
+    void onSendUserPreferenceConfigForDataDuringVoiceCall(in Token token, in Status status);
+
+    /**
+     * Response to setCellularRoamingPreference
+     *
+     * @param slotId - slot ID to which this response belongs
+     * @param token - To match request/response. Response must include the same token as
+     *        in the request. Otherwise, the token is set to -1.
+     * @param status - SUCCESS/FAILURE based on the modem result code
+     */
+    void setCellularRoamingPreferenceResponse(int slotId, in Token token, in Status status);
+
+    /**
+     * Indication to know if C_IWLAN RAT is available
+     *
+     * @param slotId - Slot Id
+     * @param ciwlanAvailable - ciwlanAvailable true indicates C_IWLAN RAT is available,
+     *        false otherwise.
+     */
+    void onCiwlanAvailable(int slotId, in boolean ciwlanAvailable);
+
+    /**
+     * Indication to know the C_IWLAN mode(only vs preferred) for home and roaming
+     *
+     * @param slotId - Slot Id
+     * @param ciwlanConfig - C_IWLAN configuration (only vs preferred) for home
+     *        and roaming
+     */
+    void onCiwlanConfigChange(int slotId, in CiwlanConfig ciwlanConfig);
+
+    /**
+    * Response to setCiwlanModeUserPreference
+    * @param slotId - Slot Id
+    * @param token - token is the same token which is recived in
+    *        setCiwlanModeUserPreference
+    * @param status - SUCCESS/FAILURE based on the modem Result code
+    */
+    void setCiwlanModeUserPreferenceResponse(int slotId, in Token token, in Status status);
+
+    /**
+     * Unsol msg to indicate changes to the NR icon
+     *
+     * @param slotId - Slot ID for which this indication is sent
+     * @param icon - NR icon type as per NrIconType.aidl and additional information
+     *        such as the Rx count
+     */
+    void onNrIconChange(int slotId, in NrIcon icon);
+
+    /**
+     * Response to queryNrIcon
+     *
+     * @param slotId - Slot ID for which this response is sent
+     * @param token - This is the same token which is sent from queryNrIcon
+     * @param status - SUCCESS/FAILURE based on the modem result code
+     * @param icon - NR icon type as per NrIconType.aidl and additional information
+     *        such as the Rx count
+     */
+    void onNrIconResponse(int slotId, in Token token, in Status status, in NrIcon icon);
+
+     /**
+     * Response to setDataPriorityPreference
+     *
+     * @param - token is the same token which is received in setDataPriorityPreference
+     * @param - status SUCCESS/FAILURE based on RIL NAS module response
+     */
+    void setDataPriorityPreferenceResponse(in Token token, in Status status);
+
+     /**
+     * Response to setTurboDsdaPreference
+     *
+     * @param - token is the same token which is received in setTurboDsdaPreference
+     * @param - status SUCCESS/FAILURE based on RIL NAS module response
+     */
+    void setTurboDsdaPreferenceResponse(in Token token, in Status status);
+
+    /**
+     * Indication to start/stop QCARE logging.
+     *
+     * @param qcareLoggingStatus The status of QCARE logging.
+     *                           0 = Stop logging
+     *                           1 = Start logging
+     */
+    void onQcareLoggingStatusChange(int qcareLoggingStatus);
+
+    /**
+     * Indication received when traffic protection status changes for a slot
+     * Based on QMI_DSD_TRAFFIC_PROT_STATUS_IND
+     *
+     * @param slotId - Slot ID for which traffic protection status changed
+     * @param isBlocked - true if traffic protection is blocked (gaming active),
+     *        false if unblocked
+     */
+    void onTrafficProtectionStatusChanged(int slotId, boolean isBlocked);
+
+    /**
+     * Response to queryRadioIcon
+     *
+     * @param slotId - Slot ID for which this response is sent
+     * @param token - This is the same token which is sent from queryRadioIcon
+     * @param status - SUCCESS/FAILURE based on the modem result code
+     * @param icon - Radio icon information including icon type and Rx count
+     */
+    void onRadioIconResponse(int slotId, in Token token, in Status status, in RadioIcon icon);
+
+    /**
+     * Unsol msg to indicate changes to the radio icon (5G, NB-IoT, etc.)
+     *
+     * @param slotId - Slot ID for which this indication is sent
+     * @param icon - Radio icon information including icon type and Rx count
+     */
+    void onRadioIconChange(int slotId, in RadioIcon icon);
+
+    /**
+     * Response to setNr5gNtnPreference
+     *
+     * @param slotId - Slot ID for which this response is sent
+     * @param token - This is the same token which is sent from setNr5gNtnPreference
+     * @param status - SUCCESS/FAILURE based on the modem result code
+     */
+    void setNr5gNtnPreferenceResponse(int slotId, in Token token, in Status status);
+
+    /**
+     * Response to sendDataStallStatus
+     *
+     * @param slotId - Slot ID for which this response is sent
+     * @param token - This is the same token which is sent from sendDataStallStatus
+     * @param status - SUCCESS/FAILURE based on the modem result code
+     */
+    void sendDataStallStatusResponse(int slotId, in Token token, in Status status);
+
+    /**
+     * Unsolicited indication sent when the auxiliary radio icon information changes.
+     *
+     * This notification is triggered without a corresponding request and is used to inform clients
+     * of updates to the auxiliary radio icon such as the DSDA category information so the UI can
+     * reflect the current modem state (for example, displaying the Turbo DSDA icon).
+     *
+     * @param auxIconInfo The updated auxiliary radio icon information
+     *
+     * @see AuxiliaryRadioIconInfo
+     */
+    void onAuxiliaryRadioIconInfoChange(in AuxiliaryRadioIconInfo auxIconInfo);
+
+    /**
+     * Callback invoked in response to the getAuxiliaryRadioIconInfo request.
+     *
+     * This method delivers the framework-facing auxiliary radio icon information originating from
+     * the modem, encapsulated in the AuxiliaryRadioIconInfo parcelable. The Status field indicates
+     * whether the request succeeded or failed, and the Token allows the caller to correlate the
+     * response with its original request.
+     *
+     * @param token       The token associated with the original request.
+     * @param status      The result of the request, including success or error codes.
+     * @param auxIconInfo The auxiliary radio icon information reported by the modem,
+     *
+     * @see AuxiliaryRadioIconInfo
+     * @see IExtPhone#getAuxiliaryRadioIconInfo
+     */
+    void onAuxiliaryRadioIconInfoResponse(in Token token, in Status status,
+                                          in AuxiliaryRadioIconInfo auxIconInfo);
+
+    /**
+     * Response to setNbTnPreference
+     *
+     * @param slotId - Slot ID for which this response is sent
+     * @param token - This is the same token which is sent from setNbTnPreference
+     * @param status - SUCCESS/FAILURE based on the modem result code
+     */
+    void onSetNbTnPreferenceResponse(int slotId, in Token token, in Status status);
 }

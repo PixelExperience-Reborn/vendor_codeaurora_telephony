@@ -24,31 +24,49 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package org.codeaurora.ims;
 
 import org.codeaurora.ims.internal.IImsScreenShareListener;
 import android.view.Surface;
+import android.os.RemoteException;
+import org.codeaurora.ims.utils.QtiImsExtUtils;
+import java.util.concurrent.Executor;
 
 public abstract class ImsScreenShareListenerBase {
 
     private final class ScreenShareListener extends IImsScreenShareListener.Stub {
 
         public void onRecordingSurfaceChanged(int phoneId, Surface surface,
-                int width, int height){
-            ImsScreenShareListenerBase.this.
-                    onRecordingSurfaceChanged(phoneId, surface, width, height);
+                int width, int height) throws RemoteException {
+            QtiImsExtUtils.executeMethodAsync(() ->
+                    ImsScreenShareListenerBase.this.
+                    onRecordingSurfaceChanged(phoneId, surface, width, height),
+                    "onRecordingSurfaceChanged", mExecutor);
         }
     }
 
     private ScreenShareListener mListener;
+    private Executor mExecutor;
 
     public IImsScreenShareListener getBinder() {
         if (mListener == null) {
             mListener = new ScreenShareListener();
         }
         return mListener;
+    }
+
+    public ImsScreenShareListenerBase() {
+        mExecutor = Runnable::run;
+    }
+
+    public ImsScreenShareListenerBase(Executor executor) {
+        mExecutor = executor;
     }
 
     protected void onRecordingSurfaceChanged(int phoneId, Surface surface,

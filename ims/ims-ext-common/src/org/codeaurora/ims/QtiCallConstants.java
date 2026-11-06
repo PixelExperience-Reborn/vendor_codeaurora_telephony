@@ -25,44 +25,16 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted (subject to the limitations in the
- * disclaimer below) provided that the following conditions are met:
- *
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *
- *   * Redistributions in binary form must reproduce the above
- *     copyright notice, this list of conditions and the following
- *     disclaimer in the documentation and/or other materials provided
- *     with the distribution.
- *
- *   * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
- *     contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
- * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
- * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
- * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package org.codeaurora.ims;
 
+import android.telecom.VideoProfile;
 import android.telephony.ims.ImsReasonInfo;
+
 /**
  * The class contains definitions for Qti specific constants related to any
  * value added features for video telephony.
@@ -152,6 +124,42 @@ public class QtiCallConstants {
     /* Call fail error code to TCP_CONNECTION_REQ */
     public static final int CODE_TCP_CONNECTION_REQ = 3005;
 
+    /* Call fail error codes 3006-3020 covers
+     * various SIP related failures*/
+    public static final int CODE_MOVED_PERMANENTLY = 3006;
+
+    public static final int CODE_UNAUTHORIZED = 3007;
+
+    public static final int CODE_PAYMENT_REQUIRED = 3008;
+
+    public static final int CODE_GONE=3009;
+
+    public static final int CODE_REMOTE_UNSUPP_MEDIA_TYPE = 3010;
+
+    public static final int CODE_UNSUPPORTED_URI_SCHEME = 3011;
+
+    public static final int CODE_BAD_EXTENSION = 3012;
+
+    public static final int CODE_PEER_NOT_REACHABLE = 3013;
+
+    public static final int CODE_NOT_ACCEPTABLE_HERE = 3014;
+
+    public static final int CODE_SERVER_NOT_IMPLEMENTED = 3015;
+
+    public static final int CODE_SERVER_BAD_GATEWAY = 3016;
+
+    public static final int CODE_SERVER_VERSION_UNSUPPORTED = 3017;
+
+    public static final int CODE_SERVER_MESSAGE_TOO_LARGE = 3018;
+
+    public static final int CODE_BUSY_EVERYWHERE = 3019;
+
+    public static final int CODE_NOT_ACCEPTABLE_GLOBAL = 3020;
+
+    public static final int CODE_RINGING_RINGBACK_TIMEOUT = 3021;
+
+    public static final int CODE_NO_ANSWER_FROM_USER = 3022;
+
     // Default code to use for additional call info code.
     public static final int CODE_UNSPECIFIED = -1;
 
@@ -206,10 +214,6 @@ public class QtiCallConstants {
     /* Video call dataUsage Key that holds the data usage consumed by Video call
        on LTE/WLAN RATs */
     public static final String VIDEO_CALL_DATA_USAGE_KEY = "dataUsage";
-
-    /* low battery extra key name that contains a boolean value,
-       TRUE meaning battery is low else FALSE */
-    public static final String LOW_BATTERY_EXTRA_KEY = "LowBattery";
 
    /* Upgrade/downgrade of a volte/vt call due to unknown reason. */
     public static final int CAUSE_CODE_UNSPECIFIED = 0;
@@ -506,10 +510,6 @@ public class QtiCallConstants {
     // This is success case, received when all the GPS errors are resolved.
     public static final int REG_ERROR_GEO_LOCATION_STATUS_RESOLVED = 2003;
 
-    /* CRS type extra key */
-    public static final String EXTRA_CRS_TYPE = "crsType";
-    /* Original call type extra key */
-    public static final String EXTRA_ORIGINAL_CALL_TYPE = "originalCallType";
     /* Slience UI before CRS RTP come extra key */
     public static final String EXTRA_IS_PREPARATORY = "isPreparatory";
     /* Ims vendor callId extra key */
@@ -521,18 +521,34 @@ public class QtiCallConstants {
     //VIDEO if only video will be played.
     public static final int CRS_TYPE_VIDEO = 1 << 1;
 
-    //Call progress info constants.
+    //Call progress info type constants.
     public static final int CALL_PROGRESS_INFO_TYPE_INVALID = -1;
     public static final int CALL_PROGRESS_INFO_TYPE_CALL_REJ_Q850 = 0;
     public static final int CALL_PROGRESS_INFO_TYPE_CALL_WAITING = 1;
     public static final int CALL_PROGRESS_INFO_TYPE_CALL_FORWARDING = 2;
     public static final int CALL_PROGRESS_INFO_TYPE_REMOTE_AVAILABLE = 3;
+    public static final int CALL_PROGRESS_INFO_TYPE_CALL_REJ_SIP = 4;
+    public static final int CALL_PROGRESS_INFO_TYPE_CALL_WARNING = 5;
     //Call progress info call rejection code
     public static final int CALL_REJECTION_CODE_INVALID = -1;
-    //Call progress info extras
-    public static final String EXTRAS_CALL_PROGRESS_INFO_TYPE = "CallProgInfoType";
-    public static final String EXTRAS_CALL_PROGRESS_REASON_CODE = "CallProgReasonCode";
-    public static final String EXTRAS_CALL_PROGRESS_REASON_TEXT = "CallProgReasonText";
+
+    //Call waiting/forwarding/remote available progress info extra
+    public static final String EXTRAS_CALL_PROGRESS_WFA_TYPE = "CallProgWfaType";
+
+    //Call reject Q850 progress info extras
+    public static final String EXTRAS_CALL_PROGRESS_REJECT_Q850_CODE = "CallProgRejectQ850Code";
+    public static final String EXTRAS_CALL_PROGRESS_REJECT_Q850_TEXT = "CallProgRejectQ850Text";
+
+    //Call reject SIP progress info extras
+    public static final String EXTRAS_CALL_PROGRESS_REJECT_SIP_CODE = "CallProgRejectSipCode";
+    public static final String EXTRAS_CALL_PROGRESS_REJECT_SIP_TEXT = "CallProgRejectSipText";
+
+    //Call warning progress info extras
+    public static final String EXTRAS_CALL_PROGRESS_WARNING_CODE = "CallProgWarningCode";
+    public static final String EXTRAS_CALL_PROGRESS_WARNING_TEXT = "CallProgWarningText";
+
+    // True if the called party is alerted and ringing
+    public static final String EXTRA_IS_CALLED_PARTY_RINGING = "isCalledPartyRinging";
 
     // Call audio quality constants.
     public static final int CALL_AUDIO_QUALITY_NO_HD = 0;
@@ -571,6 +587,28 @@ public class QtiCallConstants {
     // Video online service
     public static final String EXTRA_VIDEO_ONLINE_SERVICE_SUPPORTED = "isVosSupported";
 
+    // Visualized voice call
+    public static final String EXTRA_IS_VISUALIZED_VOICE_CALL = "isVisualizedVoiceCall";
+
+    // CRBT call
+    public static final String EXTRA_IS_CRBT_CALL = "isCrbtCall";
+
+    // Glasses Free 3d Video type
+    public static final String GLASSES_FREE_3D_VIDEO_TYPE_EXTRA_KEY = "GlassesFree3DVideoType";
+
+    /* Glasses free 3D video type constants.
+     * CALL_GFREE_3D_NONE -- No 3D video formatting.
+     * CALL_GFREE_3D_SBS -- 3D video with format as half-width side-by-side.
+     * CALL_GFREE_3D_SBS_FULL -- 3D video with format as full-width side-by-side.
+     * CALL_GFREE_3D_TAB -- 3D video with format as half-width top-and-bottom.
+     * CALL_GFREE_3D_TAB_FULL -- 3D video with format as full-width top-and-bottom.
+    */
+    public static final int CALL_GFREE_3D_NONE = 0;
+    public static final int CALL_GFREE_3D_SBS = 1;
+    public static final int CALL_GFREE_3D_SBS_FULL = 2;
+    public static final int CALL_GFREE_3D_TAB = 3;
+    public static final int CALL_GFREE_3D_TAB_FULL = 4;
+
     /**
      * The value of voice/video/text is defined according to the SRTP categories
      * and the name in the extra is defined by QC IMS service.
@@ -580,4 +618,37 @@ public class QtiCallConstants {
     public static final int SRTP_CATEGORY_VOICE = 1 << 0;
     public static final int SRTP_CATEGORY_VIDEO = 1 << 1;
     public static final int SRTP_CATEGORY_TEXT = 1 << 2;
+
+    // Call reason
+    public static final String EXTRA_CALL_REASON = "callReason";
+
+    // possible conference abort reasons
+    public static final int PENDING_EMERGENCY_CALL = 0;
+
+    // EXTRA For dual video
+    public static final String EXTRA_DUAL_VIDEO_TOKEN = "token";
+    public static final int INVALID_TOKEN_ID = -1;
+    // constant to indicate dual VT call mode (maps to ImsCallProfile value)
+    public static final String EXTRA_DUAL_VIDEO_CALL_TYPE = "dualVtCallType";
+    // constants to indicate supported dual VT modes
+    public static final String DUAL_VIDEO_CAPABILITY = "dualVtCapability";
+    public static final int DUAL_VIDEO_DISABLED = 0;
+    public static final int DUAL_VIDEO_TX_ENABLED = 1;
+    public static final int DUAL_VIDEO_RX_ENABLED = 2;
+    public static final int DUAL_VIDEO_TX_RX_ENABLED = 3;
+
+    public static final int DUAL_VIDEO_MAIN_STREAM = 0;
+    public static final int DUAL_VIDEO_ALT_STREAM = 1;
+
+    // Dual VT VideoProfile values (maps to VideoProfile alt values)
+    public static final int STATE_ALT_TX_ENABLED = 0x08;
+    public static final int STATE_ALT_RX_ENABLED = 0x10;
+    public static final int STATE_ALT_BIDIRECTIONAL = STATE_ALT_TX_ENABLED | STATE_ALT_RX_ENABLED;
+    public static final int STATE_DUAL_BIDIRECTIONAL =
+            VideoProfile.STATE_BIDIRECTIONAL | STATE_ALT_BIDIRECTIONAL;
+
+    // Intelligent calling/dialing feature setting
+    public static final String INTELLIGENT_CALLING_FEATURE = "qti.settings.intelligent_calling";
+    public static final int INTELLIGENT_CALLING_DISABLED = 0;
+    public static final int INTELLIGENT_CALLING_ENABLED = 1;
 }

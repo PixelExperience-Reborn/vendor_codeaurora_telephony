@@ -25,8 +25,8 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear.
  */
 
@@ -34,6 +34,7 @@ package org.codeaurora.ims.internal;
 
 import android.os.Bundle;
 import org.codeaurora.ims.internal.ICrsCrbtController;
+import org.codeaurora.ims.internal.IVideoCallProvider;
 import org.codeaurora.ims.internal.IQtiImsExtListener;
 import org.codeaurora.ims.internal.IImsArController;
 import org.codeaurora.ims.internal.IImsMultiIdentityInterface;
@@ -398,4 +399,66 @@ interface IQtiImsExt {
     */
     IImsArController getArController(int phoneId);
 
+    /**
+     * setGlassesFree3dVideoCapability
+     * Set glasses free 3d video capability to modem
+     *
+     * @param phoneId indicates the phone instance which triggered the request
+     * @param enable3dVideo sends whether device supports glasses free 3d video to lower layer
+     * @param listener an IQtiImsExtListener instance to indicate the response
+     * @return void
+     */
+    oneway void setGlassesFree3dVideoCapability(int phoneId, boolean enable3dVideo,
+        IQtiImsExtListener listener);
+
+    /**
+     * Retrieves vendor video call provider
+     *
+     * @param phoneId indicates the phone instance which triggered the request
+     * @param token unique identifier created per call session. Passed to clients through extras
+     */
+    IVideoCallProvider getVideoProvider(int phoneId, int token);
+
+   /**
+     * To inform IMS service for MO RTT VT upgrades/downgrades
+     *
+     * @param phoneId indicates the phone instance which triggered the request
+     * @return boolean
+     */
+    boolean setPendingOutgoingRttVtModifyFlag(int phoneId);
+
+    /**
+     * Notify IMS to register a listener for MT dual-upgrade (VT + RTT).
+     * IMS will invoke the listener before sending the VT modify request
+     * so Dialer can mark pending state for VT + RTT.
+     *
+     * @param phoneId indicates the phone instance which triggered the request
+     * @param listener callback to be notified
+     */
+    oneway void setIncomingRttVtUpgradeListener(int phoneId, IQtiImsExtListener listener);
+
+    /**
+     * Dialer needs to know for legacy modems if this feature is supported.
+     * @param phoneId indicates the phone instance which triggered the request
+     * @return boolean
+     */
+    boolean isRttVtFeatureSupported(int phoneId);
+
+    /**
+     * Checks whether Deactivate All CallBarring feature is supported
+     *
+     * @param phoneId indicates the phone instance which triggered the request
+     * @return boolean true if the feature is supported, false otherwise
+     */
+    boolean isDeactivateAllCallBarringSupported(int phoneId);
+
+    /**
+     * Checks whether Intelligent Calling feature is supported
+     * Intelligent Calling feature allows a call to be placed on a 3rd party
+     * VoIP application based on specific error codes
+     *
+     * @param phoneId indicates the phone instance which triggered the request
+     * @return boolean true if the feature is supported, false otherwise
+     */
+    boolean isIntelligentCallingFeatureSupported(int phoneId);
 }

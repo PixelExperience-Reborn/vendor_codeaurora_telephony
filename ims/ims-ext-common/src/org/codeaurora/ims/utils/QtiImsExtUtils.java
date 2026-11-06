@@ -26,9 +26,9 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the
@@ -64,6 +64,7 @@
 package org.codeaurora.ims.utils;
 
 import android.Manifest;
+import android.app.AppOpsManager;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.res.Resources;
@@ -71,6 +72,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.net.Uri;
+import android.os.Binder;
 import android.os.ParcelFileDescriptor;
 import android.os.PersistableBundle;
 import android.os.RemoteException;
@@ -85,6 +87,7 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.io.IOException;
 import java.lang.IllegalArgumentException;
 import java.lang.SecurityException;
@@ -125,23 +128,6 @@ public class QtiImsExtUtils {
 
     public static final String QTI_IMS_STATIC_IMAGE_SETTING =
             "ims_vt_call_static_image";
-
-    /* name for call transfer setting */
-    private static final String IMS_CALL_TRANSFER_SETTING = "ims_call_transfer";
-
-    /**
-     * Definitions for the call transfer type. For easier implementation,
-     * the transfer type is defined as a bit mask value.
-     */
-    //Value representing blind call transfer type
-    public static final int QTI_IMS_BLIND_TRANSFER = 0x01;
-    //Value representing assured call transfer type
-    public static final int QTI_IMS_ASSURED_TRANSFER = 0x02;
-    //Value representing consultative call transfer type
-    public static final int QTI_IMS_CONSULTATIVE_TRANSFER = 0x04;
-
-    /* Call transfer extra key */
-    public static final String QTI_IMS_TRANSFER_EXTRA_KEY = "transferType";
 
     /* Ims phoneId extra key */
     public static final String QTI_IMS_PHONE_ID_EXTRA_KEY = "phoneId";
@@ -317,22 +303,41 @@ public class QtiImsExtUtils {
         return inSampleSize;
     }
 
+    // Helper method used to decode a bitmap from the given Uri with InputStream.
+    private static Bitmap decodeStream(ContentResolver cr, Uri uri, BitmapFactory.Options o) {
+        if (cr == null || uri == null || o == null) {
+            Log.e(LOG_TAG, "decodeStream: Invalid parameters.");
+            return null;
+        }
+        try (InputStream s = cr.openInputStream(uri)) {
+            if (s == null) {
+                Log.e(LOG_TAG, "Failed to open input stream for uri: " + uri);
+                return null;
+            }
+            return BitmapFactory.decodeStream(s, null, o);
+        } catch (IOException e) {
+            Log.e(LOG_TAG, "IO error decoding uri: " + uri + " exception: " + e);
+            return null;
+        }
+    }
+
     /**
      * Decodes an image pointed to by uri as per requested Width and requested Height
      * and returns a bitmap
      */
     public static Bitmap decodeImage(String uriStr, Context context, int reqWidth, int reqHeight) {
-        if (uriStr == null) {
+        if (uriStr == null || context == null) {
             return null;
         }
-        ParcelFileDescriptor parcelFileDescriptor = null;
-
+        ContentResolver contentResolver = context.getContentResolver();
+        if (contentResolver == null) {
+            Log.e(LOG_TAG, "ContentResolver is null for context");
+            return null;
+        }
         Uri uri = Uri.parse(uriStr);
+        String scheme = uri.getScheme();
 
         try {
-            parcelFileDescriptor = context.getContentResolver().openFileDescriptor(uri, "r");
-            FileDescriptor fileDescriptor = parcelFileDescriptor.getFileDescriptor();
-
             BitmapFactory.Options options = new BitmapFactory.Options();
             // Each pixel is stored on 4 bytes
             options.inPreferredConfig = Bitmap.Config.ARGB_8888;
@@ -341,32 +346,61 @@ public class QtiImsExtUtils {
                will still be set, allowing the caller to query the bitmap
                without having to allocate the memory for its pixels */
             options.inJustDecodeBounds = true;
-            BitmapFactory.decodeFileDescriptor(fileDescriptor, null, options);
-
-            // Calculate inSampleSize
-            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
-
-            // Decode bitmap with inSampleSize set
-            options.inJustDecodeBounds = false;
-            Bitmap image = BitmapFactory.decodeFileDescriptor(fileDescriptor, null, options);
-
-            return scaleImage(image, reqWidth, reqHeight);
-        } catch (FileNotFoundException e) {
-            Log.e(LOG_TAG, "File not found for uri: " + uri + " exception : " + e);
+            Bitmap first, second = null;
+            // Decode the image with android.resource:// Uri.
+            // In this branch the URI points to a drawable inside some APK.
+            // We need to open the resource via ContentResolver instead of treating it
+            // as a regular file URI.
+            if (ContentResolver.SCHEME_ANDROID_RESOURCE.equals(scheme)) {
+                // First decode with inJustDecodeBounds=true to get raw dimensions.
+                first = decodeStream(contentResolver, uri, options);
+                if(first == null && (options.outWidth <= 0 || options.outHeight <= 0)) {
+                    Log.e(LOG_TAG, "Failed to decode bounds for uri: " + uri);
+                    return null;
+                }
+                // Calculate inSampleSize
+                options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+                // Decode bitmap with inSampleSize set
+                options.inJustDecodeBounds = false;
+                // Second decode with inJustDecodeBounds=false to get complete image.
+                // We cannot reuse the same InputStream for the real decode because
+                // decodeStream() will consume the stream. So we have to reopen the
+                // InputStream and decode again using the calculated inSampleSize.
+                second = decodeStream(contentResolver, uri, options);
+            } else {
+                try (ParcelFileDescriptor parcelFileDescriptor =
+                        contentResolver.openFileDescriptor(uri, "r")) {
+                    if (parcelFileDescriptor == null) {
+                        Log.e(LOG_TAG, "ParcelFileDescriptor is null for uri: " + uri);
+                        return null;
+                    }
+                    FileDescriptor fileDescriptor = parcelFileDescriptor.getFileDescriptor();
+                    first = BitmapFactory.decodeFileDescriptor(
+                        fileDescriptor, null, options);
+                    if(first == null && (options.outWidth <= 0 || options.outHeight <= 0)) {
+                        Log.e(LOG_TAG, "Failed to decode bounds for uri: " + uri);
+                        return null;
+                    }
+                    // Calculate inSampleSize
+                    options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+                    // Decode bitmap with inSampleSize set
+                    options.inJustDecodeBounds = false;
+                    second = BitmapFactory.decodeFileDescriptor(fileDescriptor, null, options);
+                } catch (FileNotFoundException e) {
+                    Log.e(LOG_TAG, "File not found for uri: " + uri + " exception : " + e);
+                    return null;
+                } catch (IOException e) {
+                    Log.e(LOG_TAG, "IO error decoding file uri: " + uri + " exception: " + e);
+                    return null;
+                }
+            }
+            return scaleImage(second, reqWidth, reqHeight);
         } catch (IllegalArgumentException e) {
             Log.e(LOG_TAG, "Check arguments passed to decodeFileDescriptor, exception : " + e);
         } catch (SecurityException e) {
             //If the selected static image file located under file path "/sdcard/" is deleted,
             //SecurityException is thrown by ContentResolver#openFileDescriptor.
             Log.e(LOG_TAG, "SecurityException, exception : " + e);
-        } finally {
-            try {
-                if (parcelFileDescriptor != null) {
-                    parcelFileDescriptor.close();
-                }
-            } catch (IOException e) {
-                Log.e(LOG_TAG, "Closing parcelFileDescriptor " + " exception : " + e);
-            }
         }
         return null;
     }
@@ -471,15 +505,6 @@ public class QtiImsExtUtils {
         return isCarrierConfigEnabled(phoneId, context, QtiCarrierConfigs.SHOW_VIDEO_QUALITY_UI);
     }
 
-    /***
-     * Checks if the IMS call transfer property is enabled or not.
-     * Returns true if enabled, or false otherwise.
-     */
-    public static boolean isCallTransferEnabled(Context context) {
-        return Settings.Global.getInt(context.getContentResolver(), IMS_CALL_TRANSFER_SETTING, 0)
-                == 1;
-    }
-
    /**
      * This API checks to see whether we are going to use ui extension for video call or not.
      * @param context context for getting video call ui ext configuration value
@@ -536,7 +561,7 @@ public class QtiImsExtUtils {
 
     public static boolean allowVideoCallsInLowBattery(int phoneId, Context context) {
         return isCarrierConfigEnabled(phoneId, context,
-                QtiCarrierConfigs.ALLOW_VIDEO_CALL_IN_LOW_BATTERY);
+                CarrierConfigManager.KEY_ALLOW_VIDEO_CALL_IN_LOW_BATTERY_BOOL);
     }
 
     public static boolean shallHidePreviewInVtConference(int phoneId, Context context) {
@@ -707,32 +732,9 @@ public class QtiImsExtUtils {
                 QtiCallConstants.RTT_UPON_REQUEST_MODE);
     }
 
-    // Returns true if Carrier supports RTT downgrade
-    // False otherwise
-    public static boolean isRttDowngradeSupported(int phoneId, Context context) {
-        return isCarrierConfigEnabled(phoneId, context,
-            CarrierConfigManager.KEY_RTT_DOWNGRADE_SUPPORTED_BOOL);
-    }
-
-    /* @Deprecated
-     * Returns true if Carrier supports RTT downgrade
+    /*
+     * Returns true if cached carrier config supported RTT upgrade
      * False otherwise
-     * This functionality will now be supported using {@link PhoneAccount.CAPABILITY_RTT}
-     * check
-     */
-    public static boolean isSimlessRttDowgradeSupported(int phoneId, Context context) {
-        int simLessRttDowngradeSupportedValue = android.provider.Settings.Secure.getInt(
-                context.getContentResolver(), QtiCallConstants.
-                SIMLESS_RTT_DOWNGRADE_SUPPORTED + convertRttPhoneId(phoneId),
-                QTI_IMS_RTT_DOWNGRADE_NOT_SUPPORTED);
-        return simLessRttDowngradeSupportedValue != QTI_IMS_RTT_DOWNGRADE_NOT_SUPPORTED;
-    }
-
-    /* @Deprecated
-     * Returns true if previous carrier supported RTT upgrade
-     * False otherwise
-     * This functionality will now be supported using
-     * {@link PhoneAccount.CAPABILITY_DOWNGRADE_RTT} check
      */
     public static boolean isSimlessRttSupported(int phoneId, Context context) {
         int simLessRttSupportedValue = android.provider.Settings.Secure.getInt(
@@ -762,24 +764,12 @@ public class QtiImsExtUtils {
                 QtiCarrierConfigs.KEY_CARRIER_CANCEL_MODIFY_CALL_SUPPORTED));
     }
 
-    // Compat method for legacy IMS APKs
-    public static void setAutoReject(ContentResolver contentResolver, int phoneId, boolean turnOn) {
-        setAutoRejectMode(contentResolver, phoneId,
-                turnOn ? QtiCallConstants.AR_MODE_AUTO_REJECT
-                       : QtiCallConstants.AR_MODE_ALLOW_INCOMING);
-    }
-
     // Supported for multi sim only. Allows user to set auto reject call mode for IMS MT calls
     // when high priority data is on the other sub
     public static void setAutoRejectMode(ContentResolver contentResolver, int phoneId,
             int arMode) {
         android.provider.Settings.Global.putInt(contentResolver,
                 QtiCallConstants.IMS_AUTO_REJECT_MODE + phoneId, arMode);
-    }
-
-    // Compat method for legacy IMS APKs
-    public static int getAutoReject(ContentResolver contentResolver, int phoneId) {
-        return getAutoRejectMode(contentResolver, phoneId);
     }
 
     // Supported for multi sim only.
@@ -850,13 +840,13 @@ public class QtiImsExtUtils {
     // Returns true if Carrier supports video CRS
     public static boolean isVideoCrsSupported(int phoneId, Context context) {
         return isCarrierConfigEnabled(phoneId, context,
-                QtiCarrierConfigs.KEY_CARRIER_VIDEO_CRS_SUPPORTED);
+                CarrierConfigManager.KEY_SUPPORTS_CUSTOMIZED_RINGING_SIGNAL_BOOL);
     }
 
     // Returns true if Carrier supports video CRBT
     public static boolean isVideoCrbtSupported(int phoneId, Context context) {
         return isCarrierConfigEnabled(phoneId, context,
-                QtiCarrierConfigs.KEY_CARRIER_VIDEO_CRBT_SUPPORTED);
+                CarrierConfigManager.KEY_SUPPORTS_VIDEO_RINGBACK_BOOL);
     }
 
     // Returns true if carrier supports call progress notification.
@@ -912,9 +902,30 @@ public class QtiImsExtUtils {
                 QtiCarrierConfigs.KEY_CARRIER_VIDEO_ONLINE_SERVICE_SUPPORTED);
     }
 
+    // Overloaded executeMethodAsync method for cases where permissions
+    // checks were already performed.
+    public static void executeMethodAsync(Runnable r, String errorLogName,
+                                           Executor executor) throws RemoteException {
+        try {
+            CompletableFuture.runAsync(r, executor).join();
+        } catch (CancellationException | CompletionException e) {
+            Log.w(LOG_TAG, "executeMethodAsync for " + errorLogName + " failed with: " +
+                    e.getMessage());
+            throw new RemoteException(e.getMessage());
+        }
+    }
+
     public static void executeMethodAsync(Runnable r, String errorLogName, Executor executor,
             String permission, Context context) throws RemoteException {
-        context.enforceCallingOrSelfPermission(permission, errorLogName);
+        if (MODIFY_PHONE_STATE.equals(permission)) {
+            enforceCallingOrSelfModifyPhoneState(context, errorLogName);
+        } else if (READ_PHONE_STATE.equals(permission)) {
+            enforceCallingOrSelfReadPhoneState(context, errorLogName);
+        } else {
+            Log.w(LOG_TAG, "executeMethodAsync for " + errorLogName +
+                    "No permission check");
+        }
+
         try {
             CompletableFuture.runAsync(r, executor).join();
         } catch (CancellationException | CompletionException e) {
@@ -926,7 +937,15 @@ public class QtiImsExtUtils {
 
     public static <T> T executeMethodAsyncForResult(Supplier<T> r, String errorLogName,
             Executor executor, String permission, Context context) throws RemoteException {
-        context.enforceCallingOrSelfPermission(permission, errorLogName);
+        if (MODIFY_PHONE_STATE.equals(permission)) {
+            enforceCallingOrSelfModifyPhoneState(context, errorLogName);
+        } else if (READ_PHONE_STATE.equals(permission)) {
+            enforceCallingOrSelfReadPhoneState(context, errorLogName);
+        } else {
+            Log.w(LOG_TAG, "executeMethodAsyncForResult for " + errorLogName +
+                    "No permission check");
+        }
+
         try {
             CompletableFuture<T> future = CompletableFuture.supplyAsync(r, executor);
             return future.get();
@@ -934,6 +953,69 @@ public class QtiImsExtUtils {
             Log.w(LOG_TAG, "executeMethodAsyncForResult for " + errorLogName + " failed with: " +
                     e.getMessage());
             throw new RemoteException(e.getMessage());
+        }
+    }
+
+    // Returns true if Carrier supports visualized voice call
+    public static boolean isVisualizedVoiceSupported(int phoneId, Context context) {
+        return isCarrierConfigEnabled(phoneId, context,
+                CarrierConfigManager.KEY_SUPPORTS_UNIDIRECTIONAL_VIDEO_SERVICE_BOOL);
+    }
+
+    // Returns int array if carrier supports given carrierConfig otherwise null.
+    public static int[] getIntArray(int phoneId, Context context, String carrierConfig) {
+        return QtiCarrierConfigHelper.getInstance().getIntArray(context, phoneId, carrierConfig);
+    }
+
+    // Returns true if Carrier supports glasses free 3D video
+    public static boolean isGlassesFree3DVideoSupported(int phoneId, Context context) {
+        return isCarrierConfigEnabled(phoneId, context,
+                QtiCarrierConfigs.KEY_CARRIER_GLASSES_FREE_3D_VIDEO_SUPPORTED);
+    }
+
+    public static void setIntelligentCallingFeature(ContentResolver contentResolver, int phoneId,
+            boolean value) {
+        android.provider.Settings.Global.putInt(contentResolver,
+                QtiCallConstants.INTELLIGENT_CALLING_FEATURE + phoneId,
+                value ? QtiCallConstants.INTELLIGENT_CALLING_ENABLED :
+                QtiCallConstants.INTELLIGENT_CALLING_DISABLED);
+    }
+
+    public static boolean isIntelligentCallingFeatureEnabled(ContentResolver contentResolver,
+            int phoneId) {
+        return android.provider.Settings.Global.getInt(contentResolver,
+                QtiCallConstants.INTELLIGENT_CALLING_FEATURE + phoneId,
+                QtiCallConstants.INTELLIGENT_CALLING_DISABLED) ==
+                QtiCallConstants.INTELLIGENT_CALLING_ENABLED;
+    }
+
+    private static void enforceCallingOrSelfModifyPhoneState(Context context,
+            String message) {
+        context.enforceCallingOrSelfPermission(android.Manifest.permission.MODIFY_PHONE_STATE,
+                message);
+    }
+
+    private static void enforceCallingOrSelfReadPhoneState(Context context,
+            String message) {
+        try {
+            context.enforceCallingOrSelfPermission(
+                    android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE, message);
+            // SKIP checking for run-time permission since caller has PRIVILEGED permission
+            return;
+        } catch (SecurityException privilegedPhoneStateException) {
+            try {
+                context.enforceCallingOrSelfPermission(
+                        android.Manifest.permission.READ_PHONE_STATE, message);
+            } catch (SecurityException phoneStateException) {
+                throw phoneStateException;
+            }
+        }
+        // We have READ_PHONE_STATE permission, throw exception if the AppOps bit has been
+        // revoked.
+        AppOpsManager appOps = (AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE);
+        if (appOps.noteOpNoThrow(AppOpsManager.OPSTR_READ_PHONE_STATE, Binder.getCallingUid(),
+                    context.getOpPackageName(), null, null) != AppOpsManager.MODE_ALLOWED) {
+            throw new SecurityException(message);
         }
     }
 }

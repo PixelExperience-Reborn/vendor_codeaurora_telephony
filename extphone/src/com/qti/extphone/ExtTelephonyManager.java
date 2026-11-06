@@ -28,15 +28,16 @@
  */
 
 /*
- * Changes from Qualcomm Innovation Center are provided under the following license:
- *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.qti.extphone;
 
 import android.annotation.RequiresPermission;
+import android.app.Activity;
+import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -49,7 +50,9 @@ import android.telephony.ImsiEncryptionInfo;
 import android.telephony.NetworkScanRequest;
 import android.util.Log;
 
+import com.qti.extphone.DataPriorityPreference;
 import com.qti.extphone.MsimPreference;
+import com.qti.extphone.TurboDsdaPreference;
 
 import java.lang.Integer;
 import java.util.ArrayList;
@@ -68,6 +71,29 @@ public class ExtTelephonyManager {
     private static final String LOG_TAG = "ExtTelephonyManager";
     private static final boolean DBG = true;
     private static final int INVALID = -1;
+
+    /**
+     * Feature list
+     */
+    private static final int FEATURE_BASE = 100;
+    public static final int FEATURE_BACK_TO_BACK_SUPPLEMENTARY_SERVICE_REQ = FEATURE_BASE + 1;
+    public static final int FEATURE_PERSO_UNLOCK_TEMP                      = FEATURE_BASE + 2;
+    public static final int FEATURE_GET_CIWLAN_CONFIG                      = FEATURE_BASE + 3;
+    public static final int FEATURE_CELLULAR_ROAMING                       = FEATURE_BASE + 4;
+    public static final int FEATURE_CIWLAN_MODE_PREFERENCE                 = FEATURE_BASE + 5;
+    public static final int FEATURE_SMART_TEMP_DDS_VIA_RADIO_CONFIG        = FEATURE_BASE + 6;
+    public static final int FEATURE_EMERGENCY_ENHANCEMENT                  = FEATURE_BASE + 7;
+    public static final int FEATURE_TDSCDMA_SUPPORT                        = FEATURE_BASE + 8;
+    public static final int FEATURE_NITZ_ENHANCEMENT                       = FEATURE_BASE + 9;
+    public static final int FEATURE_NR_6RX_ICON                            = FEATURE_BASE + 10;
+    public static final int FEATURE_TURBO_DSDA                             = FEATURE_BASE + 11;
+    public static final int FEATURE_MMS_PDN_IMMEDIATE_RETRY_WITH_TRAFFIC_PROTECTION =
+            FEATURE_BASE + 12;
+    public static final int FEATURE_RADIO_ICON                             = FEATURE_BASE + 13;
+    public static final int FEATURE_NR_5G_NTN                              = FEATURE_BASE + 14;
+    public static final int FEATURE_SEND_DATA_STALL_INFO                   = FEATURE_BASE + 15;
+    public static final int FEATURE_AUXILIARY_RADIO_ICON_INFO              = FEATURE_BASE + 16;
+    public static final int FEATURE_SET_NB_TN_PREFERENCE                   = FEATURE_BASE + 17;
 
     private static ExtTelephonyManager mInstance;
 
@@ -110,6 +136,25 @@ public class ExtTelephonyManager {
 
     /** SNPN access mode */
     public static final int ACCESS_MODE_SNPN = 2;
+
+    /* DATA++DATA feature's global system setting name */
+    public static final String DUAL_DATA_PREFERENCE = "dual_data_preference";
+
+    /* Default dual data preference setting*/
+    public static final int DEFAULT_DUAL_DATA_PREFERENCE = 0;
+
+    /* Data throughput priority subscription feature's global system setting name  */
+    public static final String DATA_THROUGHPUT_PRIORITY_SUB_PREFERENCE =
+            "data_throughput_priority_sub";
+
+    /* Turbo DSDA feature's global system setting name  */
+    public static final String TURBO_DSDA_PREFERENCE = "turbo_dsda";
+
+    /* NR5G NTN mode's global system setting name  */
+    public static final String NR5G_NTN_MODE_PREFERENCE = "nr5g_ntn_mode";
+
+    /* NB-TN mode's global system setting name  */
+    public static final String NB_TN_MODE_PREFERENCE = "nb_tn_mode";
 
     /**
     * Constructor
@@ -156,6 +201,12 @@ public class ExtTelephonyManager {
             Log.e(LOG_TAG, "service not connected!");
             return ret;
         }
+
+        if (feature == FEATURE_TDSCDMA_SUPPORT) {
+            log("TDSCDMA feature is not supported");
+            return ret;
+        }
+
         try {
             ret = mExtTelephonyService.isFeatureSupported(feature);
         } catch (RemoteException e){
@@ -182,8 +233,8 @@ public class ExtTelephonyManager {
             log("Creating ExtTelephonyService. If not started yet, start ...");
             addServiceCallback(cb);
             Intent intent = new Intent();
-            intent.setComponent(new ComponentName("com.qti.phone",
-                    "com.qti.phone.ExtTelephonyService"));
+            intent.setComponent(
+                    new ComponentName("com.qti.phone", "com.qti.phone.ExtTelephonyService"));
             success = mContext.bindService(intent, mConnection,
                     Context.BIND_AUTO_CREATE);
             log("bind Service result: " + success);
@@ -569,7 +620,8 @@ public class ExtTelephonyManager {
         return token;
     }
 
-    public Token setNetworkSelectionModeAutomatic(int slot, int accessType, Client client) {
+    public Token setNetworkSelectionModeAutomatic(
+            int slot, int accessType, Client client) {
         Token token = null;
         if (!isServiceConnected()) {
             Log.e(LOG_TAG, "service not connected!");
@@ -611,18 +663,10 @@ public class ExtTelephonyManager {
         return token;
     }
 
+    @Deprecated
     public Token sendCdmaSms(int slot, byte[] pdu, boolean expectMore, Client client) {
-        Token token = null;
-        if (!isServiceConnected()) {
-            Log.e(LOG_TAG, "service not connected!");
-            return token;
-        }
-        try {
-            token = mExtTelephonyService.sendCdmaSms(slot, pdu, expectMore, client);
-        } catch (RemoteException e) {
-            Log.e(LOG_TAG, "sendCdmaSms, remote exception", e);
-        }
-        return token;
+        Log.e(LOG_TAG, "sendCdmaSms API is not supported");
+        return null;
     }
 
     public Token startNetworkScan(int slot, NetworkScanRequest networkScanRequest, Client client) {
@@ -720,8 +764,8 @@ public class ExtTelephonyManager {
         return token;
     }
 
-    public Token setCarrierInfoForImsiEncryption(int slot, ImsiEncryptionInfo info,
-            Client client) {
+    public Token setCarrierInfoForImsiEncryption(
+            int slot, ImsiEncryptionInfo info, Client client) {
         Token token = null;
         if(!isServiceConnected()){
             Log.e(LOG_TAG, "service not connected!");
@@ -819,8 +863,8 @@ public class ExtTelephonyManager {
         return token;
     }
 
-    public void queryCallForwardStatus(int slotId, int cfReason, int serviceClass, String number,
-            boolean expectMore, Client client) throws RemoteException {
+    public void queryCallForwardStatus(int slotId, int cfReason, int serviceClass,
+            String number, boolean expectMore, Client client) throws RemoteException {
         try {
             mExtTelephonyService.queryCallForwardStatus(slotId, cfReason, serviceClass, number,
                     expectMore, client);
@@ -891,18 +935,49 @@ public class ExtTelephonyManager {
         return token;
     }
 
-    public Token sendUserPreferenceForDataDuringVoiceCall(int slot,
-            boolean userPreference, Client client) {
+    public Token sendUserPreferenceForDataDuringVoiceCall(
+            int slot, boolean userPreference, Client client) {
         Token token = null;
         if (!isServiceConnected()) {
             Log.e(LOG_TAG, "service not connected!");
             return token;
         }
         try {
-            token = mExtTelephonyService.sendUserPreferenceForDataDuringVoiceCall(slot,
-                    userPreference, client);
+            token = mExtTelephonyService.sendUserPreferenceForDataDuringVoiceCall(
+                    slot, userPreference, client);
         } catch (RemoteException e) {
             Log.e(LOG_TAG, "sendUserPreferenceForDataDuringVoiceCall, remote exception", e);
+        }
+        return token;
+    }
+
+    public Token getDdsSwitchConfigCapability(Client client) {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "service not connected!");
+            return token;
+        }
+        try {
+            token = mExtTelephonyService.getDdsSwitchConfigCapability(client);
+        } catch (RemoteException e) {
+            Log.e(LOG_TAG, "getDdsSwitchConfigCapability, remote exception", e);
+        }
+        return token;
+    }
+
+    public Token sendUserPreferenceConfigForDataDuringVoiceCall(
+            boolean[] isAllowedOnSlot, Client client) {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "service not connected!");
+            return token;
+        }
+        try {
+            token = mExtTelephonyService.sendUserPreferenceConfigForDataDuringVoiceCall(
+                    isAllowedOnSlot, client);
+        } catch (RemoteException e) {
+            Log.e(LOG_TAG,
+                    "sendUserPreferenceConfigForDataDuringVoiceCall, remote exception", e);
         }
         return token;
     }
@@ -1019,6 +1094,46 @@ public class ExtTelephonyManager {
         return token;
     }
 
+    public Token setDataPriorityPreference(
+            Client client, DataPriorityPreference dataPreference) throws RemoteException {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "service not connected!");
+            return token;
+        }
+        if (client == null || dataPreference == null) {
+            Log.e(LOG_TAG, "setDataPriorityPreference: invalid parameters");
+            return token;
+        }
+
+        try {
+            token = mExtTelephonyService.setDataPriorityPreference(client, dataPreference);
+        } catch (RemoteException e) {
+            Log.e(LOG_TAG, "setDataPriorityPreference ended in remote exception", e);
+        }
+        return token;
+    }
+
+    public Token setTurboDsdaPreference(
+            Client client, TurboDsdaPreference dsdaPreference) throws RemoteException {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "service not connected!");
+            return token;
+        }
+        if (client == null || dsdaPreference == null) {
+            Log.e(LOG_TAG, "setTurboDsdaPreference: invalid parameters");
+            return token;
+        }
+
+        try {
+            token = mExtTelephonyService.setTurboDsdaPreference(client, dsdaPreference);
+        } catch (RemoteException e) {
+            Log.e(LOG_TAG, "setTurboDsdaPreference ended in remote exception", e);
+        }
+        return token;
+    }
+
    /**
     * Get the supported Sim Type information on all available slots
     *
@@ -1104,6 +1219,8 @@ public class ExtTelephonyManager {
      * It is a static modem capability.
      *
      * @return - boolean TRUE/FALSE based on modem supporting dual data capability feature.
+     *
+     * Requires Permission: android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE
      */
     public boolean getDualDataCapability() {
         if (isServiceConnected()) {
@@ -1143,6 +1260,92 @@ public class ExtTelephonyManager {
         return token;
     }
 
+    /**
+     * Get current dual data recommendation
+     *
+     * @return DualDataRecommendation object when there, otherwise null.
+     *
+     * Requires Permission: android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE
+     */
+    public DualDataRecommendation getDualDataRecommendation() {
+        if (isServiceConnected()) {
+            try {
+                return mExtTelephonyService.getDualDataRecommendation(getCurrentPackageName());
+            } catch (RemoteException ex) {
+                Log.e(LOG_TAG, "getDualDataRecommendation Failed.", ex);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Request for C_IWLAN availability.
+     * This API returns true or false based on various conditions like internet PDN is established
+     * on DDS over LTE/NR RATs, CIWLAN is supported in home/roaming etc..
+     * This is different from existing API IExtPhone#isEpdgOverCellularDataSupported() which
+     * returns true if modem supports the CIWLAN feature based on static configuration in modem.
+     *
+     * @param - slotId slot ID
+     * @return - boolean TRUE/FALSE based on C_IWLAN availability.
+     */
+    public boolean isCiwlanAvailable(int slotId) {
+        if (isServiceConnected()) {
+            try {
+                return mExtTelephonyService.isCiwlanAvailable(slotId);
+            } catch (RemoteException ex) {
+                Log.e(LOG_TAG, "isCiwlanAvailable Failed.", ex);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Set C_IWLAN mode user preference.
+     *
+     * @param slotId - slot ID
+     * @param client - Client registered with package name to receive callbacks.
+     * @param CiwlanConfig - The C_IWLAN mode user preference (only vs preferred)
+                             for home and roaming.
+     * @return - Integer Token can be used to compare with the response.
+     */
+    public Token setCiwlanModeUserPreference(
+            int slotId, Client client, CiwlanConfig ciwlanConfig) {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "service not connected!");
+            return token;
+        }
+        try {
+            token = mExtTelephonyService.setCiwlanModeUserPreference(slotId, client, ciwlanConfig);
+        } catch (RemoteException e) {
+            Log.e(LOG_TAG, "setCiwlanModeUserPreference ended in remote exception", e);
+        }
+        return token;
+    }
+
+    /**
+     * Get C_IWLAN mode user preference
+     *
+     * This function returns C_IWLAN mode user preference set by the user whereas
+     * IExtPhone#getCiwlanConfig() returns actual C_IWLAN mode set by the modem.
+     *
+     * @param slotId - slot ID
+     * @return - The C_IWLAN mode user preference (only vs preferred) for home and roaming.
+     */
+    public CiwlanConfig getCiwlanModeUserPreference(int slotId) {
+        CiwlanConfig config = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "service not connected!");
+            return config;
+        }
+        try {
+            config = mExtTelephonyService.getCiwlanModeUserPreference(slotId);
+        } catch (RemoteException e) {
+            Log.e(LOG_TAG, "getCiwlanModeUserPreference ended in remote exception", e);
+        }
+        return config;
+    }
+
     public QtiPersoUnlockStatus getSimPersoUnlockStatus(int slotId) {
         QtiPersoUnlockStatus persoUnlockStatus = null;
         if (!isServiceConnected()) {
@@ -1155,6 +1358,114 @@ public class ExtTelephonyManager {
             Log.e(LOG_TAG, "Remote exception for getSimPersoUnlockStatus", e);
         }
         return persoUnlockStatus;
+    }
+
+    public CellularRoamingPreference getCellularRoamingPreference(int slotId) {
+        CellularRoamingPreference pref = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "getCellularRoamingPreference: service not connected!");
+            return pref;
+        }
+        try {
+            pref = mExtTelephonyService.getCellularRoamingPreference(slotId);
+        } catch (RemoteException ex) {
+            Log.e(LOG_TAG, "getCellularRoamingPreference failed.", ex);
+        }
+        return pref;
+    }
+
+    public Token setCellularRoamingPreference(
+            Client client, int slotId, CellularRoamingPreference pref) {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "setCellularRoamingPreference: service not connected!");
+            return token;
+        }
+        try {
+            token = mExtTelephonyService.setCellularRoamingPreference(client, slotId, pref);
+        } catch (RemoteException ex) {
+            Log.e(LOG_TAG, "setCellularRoamingPreference failed.", ex);
+        }
+        return token;
+    }
+
+    public Token queryNrIcon(int slotId, Client client) {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "queryNrIcon: service not connected!");
+            return token;
+        }
+        try {
+            token = mExtTelephonyService.queryNrIcon(slotId, client);
+        } catch (RemoteException ex) {
+            Log.e(LOG_TAG, "queryNrIcon failed.", ex);
+        }
+        return token;
+    }
+
+    /**
+     * Notify RIL about data stall detection status.
+     * This API is called when:
+     * 1. Data stall is detected on the internet data network (when smart permanent DDS switch
+     *    preference is enabled)
+     * 2. Data stall is recovered
+     * 3. DDS switch occurs (to inform both subscriptions have no data stall)
+     *
+     * @param slotId - Slot ID for which this request is sent
+     * @param client - Client registered with package name to receive callbacks
+     * @param info - Data stall information (true=stalled, false=recovered/no stall)
+     * @return - Integer Token can be used to compare with the response.
+     */
+    public Token sendDataStallStatus(int slotId, Client client, DataStallInfo info)
+            throws RemoteException {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "sendDataStallStatus: service not connected!");
+            return token;
+        }
+        if (client == null || info == null) {
+            Log.e(LOG_TAG, "sendDataStallStatus: invalid parameters");
+            return token;
+        }
+        try {
+            token = mExtTelephonyService.sendDataStallStatus(slotId, client, info);
+        } catch (RemoteException ex) {
+            Log.e(LOG_TAG, "sendDataStallStatus failed.", ex);
+            throw ex;
+        }
+        return token;
+    }
+
+    /**
+     * Set Narrowband Terrestrial Network (NB-TN) preference.
+     *
+     * NB-TN, also known as NB-IoT (Internet of Things), is a subset of the LTE standard which can
+     * support low data/delay-tolerant data applications and in case of mobile, it is used as
+     * coverage extension when regular 5G/4G/3G is not available.
+     *
+     * @param slotId - slot ID which the request applies to
+     * @param client - Client registered with package name to receive callbacks
+     * @param enable - true to enable the NB TN feature, false to disable
+     * @return - Integer Token can be used to compare with the response.
+     */
+    public Token setNbTnPreference(int slotId, Client client, boolean enable)
+            throws RemoteException {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "setNbTnPreference: service not connected!");
+            return token;
+        }
+        if (client == null) {
+            Log.e(LOG_TAG, "setNbTnPreference: invalid parameters");
+            return token;
+        }
+        try {
+            token = mExtTelephonyService.setNbTnPreference(slotId, client, enable);
+        } catch (RemoteException ex) {
+            Log.e(LOG_TAG, "setNbTnPreference failed.", ex);
+            throw ex;
+        }
+        return token;
     }
 
     public Client registerCallback(String packageName, IExtPhoneCallback callback) {
@@ -1171,13 +1482,20 @@ public class ExtTelephonyManager {
         return client;
     }
 
-    public Client registerCallbackWithEvents(String packageName, ExtPhoneCallbackListener callback,
-            int[] events) {
+    public Client registerCallbackWithEvents(
+            String packageName, ExtPhoneCallbackListener callback, int[] events) {
         Client client = null;
+        // Check if callback is null prior to service connection status
+        // to align with the counterpart unregister.
+        if (callback == null) {
+            Log.e(LOG_TAG, "Callback is null");
+            return null;
+        }
         if (!isServiceConnected()) {
             Log.e(LOG_TAG, "service not connected!");
             return client;
         }
+        callback.setup();
         try {
             client = mExtTelephonyService.registerCallbackWithEvents(packageName,
                     callback.mCallback, events);
@@ -1200,10 +1518,16 @@ public class ExtTelephonyManager {
     }
 
     public void unregisterCallback(ExtPhoneCallbackListener callback) {
+        if (callback == null) {
+            Log.e(LOG_TAG, "Callback is null");
+            return;
+        }
+        callback.cleanup();
         unRegisterCallback(callback.mCallback);
     }
 
-    public Client registerQtiRadioConfigCallback(String packageName, IExtPhoneCallback callback) {
+    public Client registerQtiRadioConfigCallback(
+            String packageName, IExtPhoneCallback callback) {
         Client client = null;
         if (!isServiceConnected()) {
             Log.e(LOG_TAG, "Service not connected!");
@@ -1227,6 +1551,244 @@ public class ExtTelephonyManager {
         } catch (RemoteException e) {
             Log.e(LOG_TAG, "unregisterQtiRadioConfigCallback, remote exception", e);
         }
+    }
+
+    /**
+     * Register for MMS PDN immediate retry notifications.
+     *
+     * @param slotId - slot ID
+     * @param pendingIntent - PendingIntent to be notified when MMS PDN immediate retry
+     *                        is available
+     */
+    public void registerForMmsPdnImmediateRetry(int slotId, PendingIntent pendingIntent) {
+        if (pendingIntent == null) {
+            Log.e(LOG_TAG, "registerForMmsPdnImmediateRetry: pendingIntent is null!");
+            return;
+        }
+        if (!isServiceConnected() || mExtTelephonyService == null) {
+            Log.e(LOG_TAG, "registerForMmsPdnImmediateRetry: service not connected!");
+            sendPendingIntentError(pendingIntent, slotId, "Service not connected");
+            return;
+        }
+        if (!isFeatureSupported(FEATURE_MMS_PDN_IMMEDIATE_RETRY_WITH_TRAFFIC_PROTECTION)) {
+            Log.e(LOG_TAG, "registerForMmsPdnImmediateRetry: feature not supported!");
+            sendPendingIntentError(pendingIntent, slotId, "Feature not supported");
+            return;
+        }
+        try {
+            mExtTelephonyService.registerForMmsPdnImmediateRetry(slotId, pendingIntent);
+        } catch (RemoteException e) {
+            Log.e(LOG_TAG, "registerForMmsPdnImmediateRetry, remote exception", e);
+            sendPendingIntentError(pendingIntent, slotId, "Remote exception");
+        }
+    }
+
+    /**
+     * Unregister for MMS PDN immediate retry notifications.
+     *
+     * @param slotId - slot ID
+     * @param pendingIntent - PendingIntent to unregister
+     */
+    public void unregisterForMmsPdnImmediateRetry(
+            int slotId, PendingIntent pendingIntent) {
+        if (pendingIntent == null) {
+            Log.e(LOG_TAG, "unregisterForMmsPdnImmediateRetry: pendingIntent is null!");
+            return;
+        }
+        if (!isServiceConnected() || mExtTelephonyService == null) {
+            Log.e(LOG_TAG, "unregisterForMmsPdnImmediateRetry: service not connected!");
+            sendPendingIntentError(pendingIntent, slotId, "Service not connected");
+            return;
+        }
+        if (!isFeatureSupported(FEATURE_MMS_PDN_IMMEDIATE_RETRY_WITH_TRAFFIC_PROTECTION)) {
+            Log.e(LOG_TAG, "unregisterForMmsPdnImmediateRetry: feature not supported!");
+            sendPendingIntentError(pendingIntent, slotId, "Feature not supported");
+            return;
+        }
+        try {
+            mExtTelephonyService.unregisterForMmsPdnImmediateRetry(slotId, pendingIntent);
+        } catch (RemoteException e) {
+            Log.e(LOG_TAG, "unregisterForMmsPdnImmediateRetry, remote exception", e);
+            sendPendingIntentError(pendingIntent, slotId, "Remote exception");
+        }
+    }
+
+    private void sendPendingIntentError(PendingIntent pendingIntent, int slotId, String error) {
+        if (pendingIntent != null) {
+            try {
+                Intent intent = new Intent();
+                intent.putExtra("error", error);
+                intent.putExtra("slot_id", slotId);
+                pendingIntent.send(mContext, Activity.RESULT_CANCELED, intent);
+            } catch (PendingIntent.CanceledException e) {
+                Log.e(LOG_TAG, "PendingIntent was canceled", e);
+            }
+        }
+    }
+
+    /**
+     * Check if MMS is unrestricted by traffic protection.
+     *
+     * @param slotId - slot ID
+     * @return - boolean TRUE if MMS is unrestricted, FALSE otherwise
+     */
+    public boolean isMmsUnrestrictedByTrafficProtection(int slotId) {
+        if (!isServiceConnected() || mExtTelephonyService == null) {
+            Log.e(LOG_TAG, "isMmsUnrestrictedByTrafficProtection: service not connected!");
+            return false;
+        }
+        if (!isFeatureSupported(FEATURE_MMS_PDN_IMMEDIATE_RETRY_WITH_TRAFFIC_PROTECTION)) {
+            Log.e(LOG_TAG, "isMmsUnrestrictedByTrafficProtection: feature not supported!");
+            return false;
+        }
+        try {
+            return mExtTelephonyService.isMmsUnrestrictedByTrafficProtection(slotId);
+        } catch (RemoteException e) {
+            Log.e(LOG_TAG, "isMmsUnrestrictedByTrafficProtection, remote exception", e);
+            return false;
+        }
+    }
+
+    /**
+     * Get the radio icon information to be shown on the UI.
+     *
+     * This API gets the current radio icon status including:
+     * - 5G icon types (BASIC, UWB, PLUS_PLUS)
+     * - NB-IoT icon status
+     * - Rx antenna configuration (e.g., 6RX)
+     *
+     * @param slotId - Slot ID for which this request is sent
+     * @param client - Client registered with package name to receive callbacks
+     * @return - Integer token to compare with the response
+     */
+    public Token queryRadioIcon(int slotId, Client client) {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "queryRadioIcon: service not connected!");
+            return token;
+        }
+
+        if (!isFeatureSupported(FEATURE_RADIO_ICON)) {
+            Log.e(LOG_TAG, "queryRadioIcon: feature not supported!");
+            return token;
+        }
+
+        try {
+            token = mExtTelephonyService.queryRadioIcon(slotId, client);
+        } catch (RemoteException ex) {
+            Log.e(LOG_TAG, "queryRadioIcon failed.", ex);
+        }
+        return token;
+    }
+
+    /**
+     * Switch the device multi-SIM configuration.
+     *
+     * This API is used by the vendor DSDS<->SS auto-switch feature (for example when
+     * {@code persist.vendor.radio.dsds_to_ss = 2}) to force the apps into a target
+     * multi-SIM mode.
+     *
+     * Typical usage:
+     * - Switch to SS (single-SIM) when fewer than two subscriptions are ACTIVE.
+     * - Switch to DSDS (dual-SIM dual-standby) when device DSDS Mode is needed.
+     *
+     * @param config Target multi-SIM configuration to apply.
+     *        - 1: SS (single SIM)
+     *        - 2: DSDS (dual SIM dual standby)
+     */
+    public void switchMultiSimConfig(int config) {
+        if (!isServiceConnected()) {
+             Log.e(LOG_TAG, "service not connected!");
+             return;
+         }
+         try {
+             mExtTelephonyService.switchMultiSimConfig(config);
+         } catch (RemoteException e) {
+             Log.e(LOG_TAG, "switchMultiSimConfig, remote exception", e);
+         }
+    }
+
+
+    /**
+     * Set NR 5G NTN (Non-Terrestrial Network) preference.
+     *
+     * This API allows setting the NR 5G NTN mode to:
+     * - DISABLE: Disable NR5G NTN
+     * - ENABLE: Enable NR5G NTN along with other existing RATs
+     * - TEST: Enable NR5G NTN only mode (test mode)
+     *
+     * @param slotId - Slot ID for which this request is sent
+     * @param mode - Nr5gNtnMode preference to be set
+     * @param client - Client registered with package name to receive callbacks
+     * @return - Integer token to compare with the response
+     */
+    public Token setNr5gNtnPreference(int slotId, Nr5gNtnMode mode, Client client)
+            throws RemoteException {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "setNr5gNtnPreference: service not connected!");
+            return token;
+        }
+
+        if (!isFeatureSupported(FEATURE_NR_5G_NTN)) {
+            Log.e(LOG_TAG, "setNr5gNtnPreference: feature not supported!");
+            return token;
+        }
+
+        if (mode == null) {
+            Log.e(LOG_TAG, "setNr5gNtnPreference: mode is null!");
+            throw new IllegalArgumentException("Nr5gNtnMode cannot be null");
+        }
+
+        try {
+            token = mExtTelephonyService.setNr5gNtnPreference(slotId, mode, client);
+        } catch (RemoteException ex) {
+            Log.e(LOG_TAG, "setNr5gNtnPreference failed.", ex);
+        }
+
+        return token;
+    }
+
+    /**
+     * Issues a request to retrieve auxiliary radio icon information that is common across
+     * subscriptions. This API is used by framework clients to obtain inforomation such as the DSDA
+     * category details (NONE, GENERAL, TURBO) that may influence how the cellular icon is rendered
+     * in UI.
+     *
+     * The request is asynchronous, and its result is returned through
+     * onAuxiliaryRadioIconInfoResponse.
+     *
+     * @param client registered with package name to receive callbacks
+     * @return integer token to compare with the response
+     * @see IExtPhoneCallback#onAuxiliaryRadioIconInfoResponse
+     */
+    public Token getAuxiliaryRadioIconInfo(Client client) throws RemoteException {
+        Token token = null;
+        if (!isServiceConnected()) {
+            Log.e(LOG_TAG, "getAuxiliaryRadioIconInfo: service not connected!");
+            return token;
+        }
+
+        if (!isFeatureSupported(FEATURE_AUXILIARY_RADIO_ICON_INFO)) {
+            Log.e(LOG_TAG, "getAuxiliaryRadioIconInfo: feature not supported!");
+            return token;
+        }
+
+        try {
+            token = mExtTelephonyService.getAuxiliaryRadioIconInfo(client);
+        } catch (RemoteException ex) {
+            Log.e(LOG_TAG, "getAuxiliaryRadioIconInfo failed.", ex);
+        }
+
+        return token;
+    }
+
+    private String getCurrentPackageName() {
+        String callingPackageName = "";
+        if (mContext != null) {
+            callingPackageName = mContext.getOpPackageName();
+        }
+        return callingPackageName;
     }
 
     private void log(String str) {

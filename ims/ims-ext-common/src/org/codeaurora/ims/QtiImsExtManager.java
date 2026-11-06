@@ -25,8 +25,8 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear.
  */
 package org.codeaurora.ims;
@@ -46,6 +46,7 @@ import org.codeaurora.ims.internal.ICrsCrbtController;
 import org.codeaurora.ims.internal.IQtiImsExt;
 import org.codeaurora.ims.internal.IQtiImsExtListener;
 import org.codeaurora.ims.internal.IImsArController;
+import org.codeaurora.ims.internal.IVideoCallProvider;
 import org.codeaurora.ims.internal.IImsMultiIdentityInterface;
 import org.codeaurora.ims.internal.IImsScreenShareController;
 import org.codeaurora.ims.utils.QtiImsExtUtils;
@@ -106,21 +107,22 @@ public class QtiImsExtManager {
 
     public void setCallForwardUncondTimer(int phoneId, int startHour, int startMinute, int endHour,
             int endMinute, int action, int condition, int serviceClass, String number,
-            IQtiImsExtListener listener) throws QtiImsException {
+            QtiImsExtListenerBaseImpl listener) throws QtiImsException {
         validateInvariants(phoneId);
         try {
             mQtiImsExt.setCallForwardUncondTimer(phoneId, startHour, startMinute, endHour,
-                endMinute, action, condition, serviceClass, number, listener);
+                endMinute, action, condition, serviceClass, number, listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService setCallForwardUncondTimer : " + e);
         }
     }
 
     public void getCallForwardUncondTimer(int phoneId, int reason, int serviceClass,
-            IQtiImsExtListener listener) throws QtiImsException {
+            QtiImsExtListenerBaseImpl listener) throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.getCallForwardUncondTimer(phoneId, reason, serviceClass, listener);
+            mQtiImsExt.getCallForwardUncondTimer(phoneId, reason, serviceClass,
+                                                 listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService getCallForwardUncondTimer : " + e);
         }
@@ -135,80 +137,114 @@ public class QtiImsExtManager {
         }
     }
 
-    public void sendCancelModifyCall(int phoneId, IQtiImsExtListener listener)
+    public void sendCancelModifyCall(int phoneId, QtiImsExtListenerBaseImpl listener)
             throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.sendCancelModifyCall(phoneId, listener);
+            mQtiImsExt.sendCancelModifyCall(phoneId, listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService sendCancelModifyCall : " + e);
         }
     }
 
-    public void queryVopsStatus(int phoneId, IQtiImsExtListener listener) throws QtiImsException {
+    public void queryVopsStatus(int phoneId, QtiImsExtListenerBaseImpl listener)
+            throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.queryVopsStatus(phoneId, listener);
+            mQtiImsExt.queryVopsStatus(phoneId, listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService queryVopsStatus : " + e);
         }
     }
 
-    public void querySsacStatus(int phoneId, IQtiImsExtListener listener) throws QtiImsException {
+    public void querySsacStatus(int phoneId, QtiImsExtListenerBaseImpl listener)
+            throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.querySsacStatus(phoneId, listener);
+            mQtiImsExt.querySsacStatus(phoneId, listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService querySsacStatus : " + e);
         }
     }
 
-    public void registerForParticipantStatusInfo(int phoneId, IQtiImsExtListener listener)
+    public void registerForParticipantStatusInfo(int phoneId, QtiImsExtListenerBaseImpl listener)
             throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.registerForParticipantStatusInfo(phoneId, listener);
+            mQtiImsExt.registerForParticipantStatusInfo(phoneId, listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService registerForParticipantStatusInfo : " + e);
         }
     }
 
     public void updateVoltePreference(int phoneId, int preference,
-            IQtiImsExtListener listener) throws QtiImsException {
+            QtiImsExtListenerBaseImpl listener) throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.updateVoltePreference(phoneId, preference, listener);
+            mQtiImsExt.updateVoltePreference(phoneId, preference, listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService updateVoltePreference : " + e);
         }
     }
 
     public void queryVoltePreference(int phoneId,
-            IQtiImsExtListener listener) throws QtiImsException {
+            QtiImsExtListenerBaseImpl listener) throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.queryVoltePreference(phoneId, listener);
+            mQtiImsExt.queryVoltePreference(phoneId, listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService queryVoltePreference : " + e);
         }
     }
 
-    public void getHandoverConfig(int phoneId, IQtiImsExtListener listener) throws QtiImsException {
+    public void getHandoverConfig(int phoneId, QtiImsExtListenerBaseImpl listener)
+            throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.getHandoverConfig(phoneId, listener);
+            mQtiImsExt.getHandoverConfig(phoneId, listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService getHandoverConfig : " + e);
         }
     }
 
-    public void setHandoverConfig(int phoneId, int hoConfig, IQtiImsExtListener listener)
+    public void setHandoverConfig(int phoneId, int hoConfig, QtiImsExtListenerBaseImpl listener)
            throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.setHandoverConfig(phoneId, hoConfig, listener);
+            mQtiImsExt.setHandoverConfig(phoneId, hoConfig, listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService setHandoverConfig : " + e);
+        }
+    }
+
+    public boolean setPendingOutgoingRttVtModifyFlag(int phoneId)
+            throws QtiImsException {
+        validateInvariants(phoneId);
+        try {
+            return mQtiImsExt.setPendingOutgoingRttVtModifyFlag(phoneId);
+        } catch (RemoteException e) {
+            throw new QtiImsException(
+                    "Remote ImsService setPendingOutgoingRttVtModifyFlag: " + e);
+        }
+    }
+
+    public void setIncomingRttVtUpgradeListener(int phoneId, QtiImsExtListenerBaseImpl listener)
+            throws QtiImsException {
+        validateInvariants(phoneId);
+        try {
+            mQtiImsExt.setIncomingRttVtUpgradeListener(phoneId, listener.getBinder());
+        } catch(RemoteException e) {
+            throw new QtiImsException("Remote ImsService setIncomingRttVtUpgradeListener : " + e);
+        }
+    }
+
+    public boolean isRttVtFeatureSupported(int phoneId)
+            throws QtiImsException {
+        validateInvariants(phoneId);
+        try {
+            return mQtiImsExt.isRttVtFeatureSupported(phoneId);
+        } catch (RemoteException e) {
+            throw new QtiImsException("Remote ImsService isRttVtFeatureSupported: " + e);
         }
     }
 
@@ -338,11 +374,11 @@ public class QtiImsExtManager {
      * Used by client to register call back listener with vendor for
      * UNSOL indication when USSD put on IMS pipe at network fails.
      */
-    public void setUssdInfoListener(int phoneId, IQtiImsExtListener listener)
+    public void setUssdInfoListener(int phoneId, QtiImsExtListenerBaseImpl listener)
             throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.setUssdInfoListener(phoneId, listener);
+            mQtiImsExt.setUssdInfoListener(phoneId, listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService setUssdInfoListener : " + e);
         }
@@ -388,31 +424,32 @@ public class QtiImsExtManager {
     }
 
     public void queryCallForwardStatus(int phoneId, int reason, int serviceClass,
-            boolean expectMore, IQtiImsExtListener listener) throws QtiImsException {
+            boolean expectMore, QtiImsExtListenerBaseImpl listener) throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.queryCallForwardStatus(phoneId, reason, serviceClass, expectMore, listener);
+            mQtiImsExt.queryCallForwardStatus(phoneId, reason, serviceClass, expectMore,
+                                              listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService queryCallForwardStatus : " + e);
         }
     }
 
     public void queryCallBarring(int phoneId, int cbType, String password, int serviceClass,
-            boolean expectMore, IQtiImsExtListener listener) throws QtiImsException {
+            boolean expectMore, QtiImsExtListenerBaseImpl listener) throws QtiImsException {
         validateInvariants(phoneId);
         try {
             mQtiImsExt.queryCallBarring(phoneId, cbType, password, serviceClass, expectMore,
-                    listener);
+                    listener.getBinder());
         } catch(RemoteException e) {
             throw new QtiImsException("Remote ImsService queryCallBarring : " + e);
         }
     }
 
-    public void exitScbm(int phoneId, IQtiImsExtListener listener)
+    public void exitScbm(int phoneId, QtiImsExtListenerBaseImpl listener)
             throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.exitScbm(phoneId, listener);
+            mQtiImsExt.exitScbm(phoneId, listener.getBinder());
         } catch (RemoteException e) {
             throw new QtiImsException("Remote ImsService exitScbm: " + e);
         }
@@ -458,20 +495,20 @@ public class QtiImsExtManager {
     }
 
     public void sendVosSupportStatus(int phoneId, boolean isVosSupported,
-            IQtiImsExtListener listener) throws QtiImsException {
+            QtiImsExtListenerBaseImpl listener) throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.sendVosSupportStatus(phoneId, isVosSupported, listener);
+            mQtiImsExt.sendVosSupportStatus(phoneId, isVosSupported, listener.getBinder());
         } catch (RemoteException e) {
             throw new QtiImsException("Remote ImsService sendVosSupportStatus: " + e);
         }
     }
 
     public void sendVosActionInfo(int phoneId, VosActionInfo vosActionInfo,
-            IQtiImsExtListener listener) throws QtiImsException {
+            QtiImsExtListenerBaseImpl listener) throws QtiImsException {
         validateInvariants(phoneId);
         try {
-            mQtiImsExt.sendVosActionInfo(phoneId, vosActionInfo, listener);
+            mQtiImsExt.sendVosActionInfo(phoneId, vosActionInfo, listener.getBinder());
         } catch (RemoteException e) {
             throw new QtiImsException("Remote ImsService sendVosActionInfo: " + e);
         }
@@ -494,4 +531,54 @@ public class QtiImsExtManager {
         }
     }
 
+    public void setGlassesFree3dVideoCapability(int phoneId, boolean enable3dVideo,
+            QtiImsExtListenerBaseImpl listener) throws QtiImsException {
+        validateInvariants(phoneId);
+        try {
+            mQtiImsExt.setGlassesFree3dVideoCapability(phoneId, enable3dVideo,
+                                                       listener.getBinder());
+        } catch (RemoteException e) {
+            throw new QtiImsException("Remote ImsService setGlassesFree3dVideoCapability: " + e);
+        }
+    }
+
+    public VideoCallProviderManager getVideoCallProviderManager(int phoneId, int token)
+            throws QtiImsException {
+        validateInvariants(phoneId);
+        IVideoCallProvider provider = getVideoCallProvider(phoneId, token);
+        if (provider == null) {
+            throw new QtiImsException("VideoCallProvider Interface is null");
+        }
+        return new VideoCallProviderManager(phoneId, token, provider, this);
+    }
+
+    /* package private */
+    IVideoCallProvider getVideoCallProvider(int phoneId, int token) throws QtiImsException {
+        validateInvariants(phoneId);
+        try {
+            return mQtiImsExt.getVideoProvider(phoneId, token);
+        } catch (RemoteException e) {
+            throw new QtiImsException("Failed to retrieve VideoCallProvider Interface : " + e);
+        }
+    }
+
+    public boolean isDeactivateAllCallBarringSupported(int phoneId) throws QtiImsException {
+        validateInvariants(phoneId);
+        try {
+            return mQtiImsExt.isDeactivateAllCallBarringSupported(phoneId);
+        } catch(RemoteException e) {
+            throw new QtiImsException("Remote ImsService isDeactivateAllCallBarringSupported :"
+                + e);
+        }
+    }
+
+    public boolean isIntelligentCallingFeatureSupported(int phoneId) throws QtiImsException {
+        validateInvariants(phoneId);
+        try {
+            return mQtiImsExt.isIntelligentCallingFeatureSupported(phoneId);
+        } catch(RemoteException e) {
+            throw new QtiImsException("Remote ImsService isIntelligentCallingFeatureSupported :"
+                + e);
+        }
+    }
 }

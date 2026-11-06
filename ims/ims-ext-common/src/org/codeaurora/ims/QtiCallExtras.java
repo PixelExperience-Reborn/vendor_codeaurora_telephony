@@ -24,6 +24,10 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package org.codeaurora.ims;
@@ -49,4 +53,10 @@ public class QtiCallExtras {
      * {@link QtiCallConstants#CALL_AUDIO_QUALITY_*}
      */
     public static final String EXTRAS_CALL_AUDIO_QUALITY = "CallAudioQuality";
+
+    /* This extra is used to update the reason for retry call over CS.
+     * CS retry call reason extra key. The value will be an Integer.
+     * {@link ImsUtils#SIP_*}
+     */
+    public static final String EXTRAS_CS_RETRY_REASON_CODE = "CsRetryReasonCode";
 }
