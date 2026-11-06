@@ -16,7 +16,20 @@ CLO_TREE=358d126b6232e39c7bc961b8810df207afee9d12
 [[ ! -e "$TARGET" ]] || { echo "FAIL: target directory already exists" >&2; exit 1; }
 git clone -q --filter=blob:none --branch "$PE_BRANCH" "$PE_URL" "$TARGET"
 head=$(git -C "$TARGET" rev-parse HEAD)
-[[ "$head" == "$PE_BASE" ]] || { echo "FAIL: PE integration branch moved: $head" >&2; exit 1; }
+if [[ "$head" != "$PE_BASE" ]]; then
+    # Once the exact source import is published, reruns must verify it
+    # without modifying any already-reviewed Git branch.
+    REVIEWED_MERGE=58543d6299a7c99eac59eda56774372bd3c4e618
+    parents=$(git -C "$TARGET" rev-list --parents -n 1 HEAD)
+    actual_tree=$(git -C "$TARGET" rev-parse HEAD^{tree})
+    if [[ "$head" != "$REVIEWED_MERGE" || "$actual_tree" != "$CLO_TREE" ||
+          "$parents" != "$head $PE_BASE $CLO_COMMIT" ]]; then
+        echo "FAIL: PE integration branch moved without review: $head" >&2
+        exit 1
+    fi
+    echo "PASS: existing direct Qualcomm import $head; verified two parents and exact tree"
+    exit 0
+fi
 
 ref=$(timeout 80 git ls-remote --tags --refs "$CLO_URL" "refs/tags/$CLO_TAG" | cut -f1)
 [[ "$ref" == "$CLO_TAG_OBJECT" ]] || { echo "FAIL: unexpected official CodeLinaro tag ref: $ref" >&2; exit 1; }
