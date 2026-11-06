@@ -1,0 +1,96 @@
+name: Android17 Qualcomm CodeLinaro telephony source discovery
+
+on:
+  push:
+    branches:
+      - audit/a17-qti-telephony-mondrian-20261106
+    paths:
+      - '.github/workflows/a17-qti-codeaurora-source-discovery.yml'
+      - 'docs/ANDROID_17_QUALCOMM_SOURCE_SELECTION.md'
+  pull_request:
+    paths:
+      - '.github/workflows/a17-qti-codeaurora-source-discovery.yml'
+      - 'docs/ANDROID_17_QUALCOMM_SOURCE_SELECTION.md'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-codeaurora-telephony:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout only audited PE repository text
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .gitupstream
+            docs/
+            .github/workflows/
+          persist-credentials: false
+      - name: Discover exact official CodeLinaro Git remote and refs
+        run: |
+          set -euo pipefail
+          UPSTREAM=$(tr -d '\r\n' < .gitupstream)
+          test "$UPSTREAM" = "https://git.codelinaro.org/clo/la/platform/vendor/codeaurora/telephony"
+          echo "Auditing upstream: $UPSTREAM"
+          timeout 80 git -c http.lowSpeedLimit=500 -c http.lowSpeedTime=20 \
+            ls-remote --symref "$UPSTREAM" HEAD \
+            | tee "$RUNNER_TEMP/codeaurora-head.txt"
+          timeout 100 git -c http.lowSpeedLimit=500 -c http.lowSpeedTime=20 \
+            ls-remote --heads --tags "$UPSTREAM" \
+            > "$RUNNER_TEMP/codeaurora-all-refs.txt"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          root = Path(os.environ["RUNNER_TEMP"])
+          lines = (root / "codeaurora-all-refs.txt").read_text(encoding="utf-8").splitlines()
+          refs = {}
+          for line in lines:
+              sha, ref = line.split("\t", 1)
+              if ref.endswith("^{}"):
+                  continue
+              if ref in refs and refs[ref] != sha:
+                  raise RuntimeError(f"ambiguous upstream ref {ref}")
+              refs[ref] = sha
+          print(f"PASS: official Qualcomm telephony Git remote accessible, {len(refs)} public heads/tags")
+          tags = [(ref, sha) for ref, sha in refs.items()
+                  if ref.startswith("refs/tags/") and
+                  re.search(r"(QSSI|QISI).*17[._]|WAIPIO", ref, re.I)]
+          heads = [(ref, sha) for ref, sha in refs.items()
+                   if ref.startswith("refs/heads/") and
+                   re.search(r"(qssi|qisi|a17|17[._]|waipio)", ref, re.I)]
+          print(f"QUALCOMM source tag candidates: {len(tags)}; branch candidates: {len(heads)}")
+          for ref, sha in sorted(tags)[-30:]:
+              print(f"OFFICIAL TAG {ref}: {sha}")
+          for ref, sha in sorted(heads)[-30:]:
+              print(f"OFFICIAL BRANCH {ref}: {sha}")
+          if not tags and not heads:
+              print("OPEN: no obviously Android17/WAIPIO-labelled refs in this specific upstream project")
+              print("Do not infer Qualcomm source compatibility from broader platform QSSI release tags")
+          print("SOURCE DISCOVERY ONLY: no branch selected, no code merged, no APKs or services built")
+          PY
+      - name: Confirm PE Android17 ROM remains independent of this library
+        run: |
+          git clone -q --depth=1 \
+            --branch port/a17-aosp17-manifest-20261102 \
+            https://github.com/PixelExperience-Reborn/manifest.git "$RUNNER_TEMP/manifest"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path(os.environ["RUNNER_TEMP"]) / "manifest"
+          project = ET.parse(root / "aosp17_reference.xml").getroot().findall("project")
+          owners = {p.get("path") or p.get("name"): p.get("name") for p in project}
+          assert "vendor/codeaurora/telephony" not in owners
+          assert owners["hardware/ril"] == "platform/hardware/ril"
+          assert owners["frameworks/opt/telephony"] == "platform/frameworks/opt/telephony"
+          print("PASS: official baseline has no unreviewed Qualcomm telephony override")
+          PY
+      - name: Scope boundary
+        run: |
+          echo "READ-ONLY source discovery. Device trees, RIL/IMS blobs, ROM manifest unchanged."
+          echo "OPEN: pick stable compatible upstream SHA; AOSP17 Soong, AIDL, vendor IMS, real mondrian tests."

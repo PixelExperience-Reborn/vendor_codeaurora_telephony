@@ -1,0 +1,103 @@
+name: A17 Qualcomm QSSI17 direct source integration gate
+
+on:
+  push:
+    branches:
+      - audit/a17-qti-telephony-mondrian-20261106
+    paths:
+      - 'audit/import_official_qti.sh'
+      - 'docs/ANDROID_17_QUALCOMM_SOURCE_SELECTION.md'
+      - '.github/workflows/a17-qti-direct-source-integration.yml'
+  pull_request:
+    paths:
+      - 'audit/import_official_qti.sh'
+      - 'docs/ANDROID_17_QUALCOMM_SOURCE_SELECTION.md'
+      - '.github/workflows/a17-qti-direct-source-integration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source audit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify pinned Qualcomm history and prepare local two-parent candidate
+        run: |
+          bash audit/import_official_qti.sh "$RUNNER_TEMP/qualcomm-candidate"
+      - name: Assert no framework/device or manifest activation
+        run: |
+          git clone -q --depth=1 \
+            --branch port/a17-aosp17-manifest-20261102 \
+            https://github.com/PixelExperience-Reborn/manifest.git "$RUNNER_TEMP/manifest"
+          cd "$RUNNER_TEMP/manifest"
+          python3 tools/validate_aosp17_base_profiles.py
+          python3 -m unittest discover -s tools \
+            -p 'test_aosp17_manifest_entrypoint.py' -v
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root=ET.parse("aosp17_reference.xml").getroot()
+          owners={p.get("path") or p.get("name"):p.get("name") for p in root.findall("project")}
+          assert "vendor/codeaurora/telephony" not in owners
+          assert owners["frameworks/opt/telephony"]=="platform/frameworks/opt/telephony"
+          assert owners["hardware/ril"]=="platform/hardware/ril"
+          print("PASS: Qualcomm Java API source not imported into AOSP17 platform without ABI check")
+          PY
+      - name: Preflight scope
+        run: |
+          echo "SOURCE ONLY: exact CodeLinaro 17.0 commit/tree, PE history, AIDL and Soong shape."
+          echo "NOT TESTED: proprietary Xiaomi IMS, Java HIDL API, Soong compile, SIM or real calls."
+
+  publish-isolated-source:
+    needs: source-preflight
+    if: github.event_name == 'push' && github.ref == 'refs/heads/audit/a17-qti-telephony-mondrian-20261106'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout source audit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Commit verified exact Qualcomm source only to isolated branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BASE=cdfe819ba8d596f435417931463d769a8e59f2da
+          CLO_COMMIT=7c646f8194d7915073701168b7c0ffd559f32773
+          CLO_TREE=358d126b6232e39c7bc961b8810df207afee9d12
+          REPO=https://github.com/PixelExperience-Reborn/vendor_codeaurora_telephony.git
+          BRANCH=integrate/a17-qti-telephony-source-20261106
+          present=$(git ls-remote "$REPO" "refs/heads/$BRANCH" | cut -f1)
+          [[ -n "$present" ]] || { echo "FAIL: target integration branch missing"; exit 1; }
+          if [[ "$present" != "$BASE" ]]; then
+            git clone -q --filter=blob:none --branch "$BRANCH" "$REPO" "$RUNNER_TEMP/existing"
+            sha=$(git -C "$RUNNER_TEMP/existing" rev-parse HEAD)
+            tree=$(git -C "$RUNNER_TEMP/existing" rev-parse HEAD^{tree})
+            parents=$(git -C "$RUNNER_TEMP/existing" rev-list --parents -n 1 HEAD)
+            if [[ "$sha" == "$present" && "$tree" == "$CLO_TREE" && \
+                  "$parents" == "$sha $BASE $CLO_COMMIT" ]]; then
+              echo "PASS: existing pinned Qualcomm source merge and both parents verified"
+              exit 0
+            fi
+            echo "FAIL: existing integration branch moved without review; refusing overwrite" >&2
+            exit 1
+          fi
+          bash audit/import_official_qti.sh "$RUNNER_TEMP/source-to-publish"
+          sha=$(git -C "$RUNNER_TEMP/source-to-publish" rev-parse HEAD)
+          [[ "$(git -C "$RUNNER_TEMP/source-to-publish" rev-parse HEAD^{tree})" == "$CLO_TREE" ]]
+          basic=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -C "$RUNNER_TEMP/source-to-publish" \
+            -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $basic" \
+            push --porcelain origin "HEAD:refs/heads/$BRANCH"
+          actual=$(git ls-remote "$REPO" "refs/heads/$BRANCH" | cut -f1)
+          [[ "$actual" == "$sha" ]] || { echo "FAIL: published integration SHA changed"; exit 1; }
+          echo "PASS: pinned direct Qualcomm Android17 source published in isolated branch $sha"
+          echo "NOT CLAIMED: any modem/IMS functionality or Android17 ROM build"
