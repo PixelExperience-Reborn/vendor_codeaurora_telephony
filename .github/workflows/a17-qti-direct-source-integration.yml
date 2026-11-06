@@ -6,10 +6,12 @@ on:
       - audit/a17-qti-telephony-mondrian-20261106
     paths:
       - 'audit/import_official_qti.sh'
+      - 'docs/ANDROID_17_QUALCOMM_SOURCE_SELECTION.md'
       - '.github/workflows/a17-qti-direct-source-integration.yml'
   pull_request:
     paths:
       - 'audit/import_official_qti.sh'
+      - 'docs/ANDROID_17_QUALCOMM_SOURCE_SELECTION.md'
       - '.github/workflows/a17-qti-direct-source-integration.yml'
 
 permissions:
